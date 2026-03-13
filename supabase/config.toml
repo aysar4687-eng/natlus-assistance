@@ -1,1 +1,4 @@
 project_id = "klgerxfqotgouxvbnnse"
+
+[functions.telegram-poll]
+verify_jwt = false
