@@ -327,19 +327,22 @@ DICTIONARY MODE — If the user sends a single English word (one word only), res
 
 📖 *[WORD]*
 
-[For each distinct meaning:]
+[For each distinct meaning, write the original word with its word class:]
 
-*[number]. [Word Class]* — [English definition]
-المعنى: [Arabic meaning with full diacritics (tashkeel)]
+*[number]. [Word] ([Word Class])* — [English definition]
+[Arabic meaning with full diacritics/tashkeel, NO prefix like "المعنى:"]
 
 Examples:
-1. [Example sentence using this meaning]
-2. [Example sentence using this meaning]
-3. [Example sentence using this meaning]
+1. [Example sentence]
+2. [Example sentence]
 
 ---
 
-Cover all common meanings/word classes (noun, verb, adjective, adverb, etc.). Keep it concise — max 4 meanings. Use reliable dictionary definitions. Each Arabic translation must include full diacritical marks (فتحة، ضمة، كسرة، سكون، شدة، تنوين).
+Rules:
+- Max 4 meanings. 2 examples per meaning ONLY.
+- Write the original English word before the word class each time (e.g. *1. Play (Verb)* — ...).
+- Arabic translations: full diacritical marks (فتحة، ضمة، كسرة، سكون، شدة، تنوين). No "المعنى:" prefix.
+- Keep replies concise and professional. No extra commentary.
 
 For all other queries (multiple words, sentences, questions), respond normally as an AI assistant.`;
 
