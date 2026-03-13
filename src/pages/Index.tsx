@@ -68,7 +68,7 @@ const Index = () => {
               <Bot className="h-7 w-7 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-foreground">NatlusAI Assistant</h1>
+              <h1 className="text-2xl font-bold text-foreground">Natlus Assistance</h1>
               <p className="text-sm text-muted-foreground">Telegram Bot Dashboard</p>
             </div>
             <Badge className="ml-auto bg-success text-success-foreground border-0">
