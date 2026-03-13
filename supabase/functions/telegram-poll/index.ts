@@ -227,9 +227,15 @@ async function sendChatAction(chatId: number, action: string, lovableKey: string
   } catch (e) { /* silent */ }
 }
 
+function convertToTelegramMarkdown(text: string): string {
+  // Convert **bold** to *bold* for Telegram Markdown
+  return text.replace(/\*\*(.+?)\*\*/g, '*$1*');
+}
+
 async function sendTelegramMessage(chatId: number, text: string, lovableKey: string, telegramKey: string, replyToMessageId?: number) {
   try {
-    const chunks = splitMessage(text, 4000);
+    const formattedText = convertToTelegramMarkdown(text);
+    const chunks = splitMessage(formattedText, 4000);
     let lastSent = null;
 
     for (const chunk of chunks) {
@@ -248,7 +254,9 @@ async function sendTelegramMessage(chatId: number, text: string, lovableKey: str
 
       const data = await response.json();
       if (!response.ok) {
+        // Fallback: send without formatting
         body.parse_mode = undefined;
+        body.text = chunk.replace(/\*/g, '');
         const retry = await fetch(`${GATEWAY_URL}/sendMessage`, {
           method: 'POST',
           headers: {
