@@ -14,7 +14,140 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      telegram_bot_logs: {
+        Row: {
+          action: string
+          chat_id: number
+          created_at: string
+          details: Json | null
+          id: string
+          message_id: number | null
+        }
+        Insert: {
+          action: string
+          chat_id: number
+          created_at?: string
+          details?: Json | null
+          id?: string
+          message_id?: number | null
+        }
+        Update: {
+          action?: string
+          chat_id?: number
+          created_at?: string
+          details?: Json | null
+          id?: string
+          message_id?: number | null
+        }
+        Relationships: []
+      }
+      telegram_bot_state: {
+        Row: {
+          id: number
+          update_offset: number
+          updated_at: string
+        }
+        Insert: {
+          id: number
+          update_offset?: number
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          update_offset?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      telegram_conversations: {
+        Row: {
+          bot_message_id: number | null
+          bot_response: string | null
+          chat_id: number
+          created_at: string
+          id: string
+          parent_conversation_id: string | null
+          user_id: number
+          user_message_id: number | null
+          user_text: string | null
+        }
+        Insert: {
+          bot_message_id?: number | null
+          bot_response?: string | null
+          chat_id: number
+          created_at?: string
+          id?: string
+          parent_conversation_id?: string | null
+          user_id: number
+          user_message_id?: number | null
+          user_text?: string | null
+        }
+        Update: {
+          bot_message_id?: number | null
+          bot_response?: string | null
+          chat_id?: number
+          created_at?: string
+          id?: string
+          parent_conversation_id?: string | null
+          user_id?: number
+          user_message_id?: number | null
+          user_text?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_conversations_parent_conversation_id_fkey"
+            columns: ["parent_conversation_id"]
+            isOneToOne: false
+            referencedRelation: "telegram_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      telegram_messages: {
+        Row: {
+          chat_id: number
+          created_at: string
+          id: string
+          is_bot_command: boolean | null
+          message_id: number | null
+          processed: boolean | null
+          raw_update: Json
+          reply_to_message_id: number | null
+          text: string | null
+          update_id: number
+          user_id: number | null
+          username: string | null
+        }
+        Insert: {
+          chat_id: number
+          created_at?: string
+          id?: string
+          is_bot_command?: boolean | null
+          message_id?: number | null
+          processed?: boolean | null
+          raw_update: Json
+          reply_to_message_id?: number | null
+          text?: string | null
+          update_id: number
+          user_id?: number | null
+          username?: string | null
+        }
+        Update: {
+          chat_id?: number
+          created_at?: string
+          id?: string
+          is_bot_command?: boolean | null
+          message_id?: number | null
+          processed?: boolean | null
+          raw_update?: Json
+          reply_to_message_id?: number | null
+          text?: string | null
+          update_id?: number
+          user_id?: number | null
+          username?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
