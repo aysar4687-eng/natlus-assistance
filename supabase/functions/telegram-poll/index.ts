@@ -327,10 +327,10 @@ DICTIONARY MODE — If the user sends a single English word (one word only), res
 
 📖 *[WORD]*
 
-[For each distinct meaning, write the original word with its word class:]
+[For each distinct meaning:]
 
-*[number]. [Word] ([Word Class])* — [English definition]
-[Arabic meaning with full diacritics/tashkeel, NO prefix like "المعنى:"]
+*[number]. [Word] ([Word Class])* — [Arabic meaning with full diacritics/tashkeel]
+[English definition]
 
 Examples:
 1. [Example sentence]
