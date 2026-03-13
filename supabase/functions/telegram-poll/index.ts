@@ -2,8 +2,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 
 const GATEWAY_URL = 'https://connector-gateway.lovable.dev/telegram';
-const MAX_RUNTIME_MS = 55_000;
-const MIN_REMAINING_MS = 5_000;
+const MAX_RUNTIME_MS = 58_000; // Push closer to 60s limit
+const MIN_REMAINING_MS = 2_000; // Minimal buffer
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -27,7 +27,6 @@ serve(async (req) => {
 
   let totalProcessed = 0;
 
-  // Read initial offset
   const { data: state, error: stateErr } = await supabase
     .from('telegram_bot_state')
     .select('update_offset')
@@ -45,7 +44,9 @@ serve(async (req) => {
     const remainingMs = MAX_RUNTIME_MS - elapsed;
     if (remainingMs < MIN_REMAINING_MS) break;
 
-    const timeout = Math.min(50, Math.floor(remainingMs / 1000) - 5);
+    // Short poll timeout for fast response — 2 seconds max
+    // This means we check for new messages every ~2s instead of long-polling
+    const timeout = Math.min(2, Math.floor(remainingMs / 1000) - 1);
     if (timeout < 1) break;
 
     try {
@@ -66,111 +67,22 @@ serve(async (req) => {
       const data = await response.json();
       if (!response.ok) {
         console.error('Telegram getUpdates error:', data);
-        return new Response(JSON.stringify({ error: data }), { status: 502, headers: corsHeaders });
+        // Don't exit — retry after brief pause
+        await new Promise(r => setTimeout(r, 1000));
+        continue;
       }
 
       const updates = data.result ?? [];
       if (updates.length === 0) continue;
 
-      for (const update of updates) {
-        const msg = update.message;
-        if (!msg) continue;
+      // Process all updates concurrently for speed
+      const processPromises = updates.map((update: any) => 
+        processUpdate(update, supabase, LOVABLE_API_KEY, TELEGRAM_API_KEY)
+      );
+      const results = await Promise.allSettled(processPromises);
+      totalProcessed += results.filter(r => r.status === 'fulfilled').length;
 
-        const text = msg.text || '';
-        const chatId = msg.chat.id;
-        const userId = msg.from?.id;
-        const username = msg.from?.username || msg.from?.first_name || 'Unknown';
-        const messageId = msg.message_id;
-        const replyToMessageId = msg.reply_to_message?.message_id;
-        const isAskCommand = text.startsWith('/ask');
-
-        // Store the message
-        await supabase.from('telegram_messages').upsert({
-          update_id: update.update_id,
-          chat_id: chatId,
-          message_id: messageId,
-          user_id: userId,
-          username,
-          text,
-          reply_to_message_id: replyToMessageId,
-          is_bot_command: isAskCommand,
-          raw_update: update,
-          processed: false,
-        }, { onConflict: 'update_id' });
-
-        // Check if this is a /ask command or a reply to a bot message
-        let shouldProcess = false;
-        let questionText = '';
-        let parentConversationId: string | null = null;
-
-        if (isAskCommand) {
-          shouldProcess = true;
-          questionText = text.replace(/^\/ask\s*/, '').trim();
-          if (!questionText) {
-            // Send usage hint
-            await sendTelegramMessage(chatId, 'Usage: /ask <your question>', LOVABLE_API_KEY, TELEGRAM_API_KEY, messageId);
-            continue;
-          }
-        } else if (replyToMessageId) {
-          // Check if this is a reply to a bot message
-          const { data: conv } = await supabase
-            .from('telegram_conversations')
-            .select('id')
-            .eq('chat_id', chatId)
-            .eq('bot_message_id', replyToMessageId)
-            .single();
-
-          if (conv) {
-            shouldProcess = true;
-            questionText = text.trim();
-            parentConversationId = conv.id;
-          }
-        }
-
-        if (shouldProcess && questionText) {
-          // Send typing indicator
-          await sendChatAction(chatId, 'typing', LOVABLE_API_KEY, TELEGRAM_API_KEY);
-
-          // Build conversation history for context
-          const conversationHistory = await getConversationHistory(supabase, chatId, userId, parentConversationId);
-
-          // Call AI
-          const aiResponse = await callAI(questionText, conversationHistory, LOVABLE_API_KEY);
-
-          // Send response
-          const sentMessage = await sendTelegramMessage(chatId, aiResponse, LOVABLE_API_KEY, TELEGRAM_API_KEY, messageId);
-
-          // Store conversation for memory
-          if (sentMessage) {
-            await supabase.from('telegram_conversations').insert({
-              chat_id: chatId,
-              user_id: userId,
-              bot_message_id: sentMessage.message_id,
-              user_message_id: messageId,
-              user_text: questionText,
-              bot_response: aiResponse,
-              parent_conversation_id: parentConversationId,
-            });
-          }
-
-          // Mark as processed
-          await supabase.from('telegram_messages')
-            .update({ processed: true })
-            .eq('update_id', update.update_id);
-
-          // Log
-          await supabase.from('telegram_bot_logs').insert({
-            chat_id: chatId,
-            message_id: messageId,
-            action: isAskCommand ? 'ask_command' : 'reply_followup',
-            details: { username, question: questionText, response_length: aiResponse.length },
-          });
-        }
-
-        totalProcessed++;
-      }
-
-      // Advance offset
+      // Advance offset immediately
       const newOffset = Math.max(...updates.map((u: any) => u.update_id)) + 1;
       await supabase.from('telegram_bot_state')
         .update({ update_offset: newOffset, updated_at: new Date().toISOString() })
@@ -179,7 +91,8 @@ serve(async (req) => {
 
     } catch (err) {
       console.error('Poll loop error:', err);
-      break;
+      await new Promise(r => setTimeout(r, 1000));
+      continue; // Don't break — keep trying
     }
   }
 
@@ -187,6 +100,118 @@ serve(async (req) => {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 });
+
+async function processUpdate(update: any, supabase: any, lovableKey: string, telegramKey: string) {
+  const msg = update.message;
+  if (!msg) return;
+
+  const text = msg.text || '';
+  const chatId = msg.chat.id;
+  const userId = msg.from?.id;
+  const username = msg.from?.username || msg.from?.first_name || 'Unknown';
+  const messageId = msg.message_id;
+  const replyToMessageId = msg.reply_to_message?.message_id;
+  const isAskCommand = text.startsWith('/ask');
+
+  // Store message (fire and forget for speed)
+  const storePromise = supabase.from('telegram_messages').upsert({
+    update_id: update.update_id,
+    chat_id: chatId,
+    message_id: messageId,
+    user_id: userId,
+    username,
+    text,
+    reply_to_message_id: replyToMessageId,
+    is_bot_command: isAskCommand,
+    raw_update: update,
+    processed: false,
+  }, { onConflict: 'update_id' });
+
+  let shouldProcess = false;
+  let questionText = '';
+  let parentConversationId: string | null = null;
+
+  if (isAskCommand) {
+    shouldProcess = true;
+    questionText = text.replace(/^\/ask\s*/, '').trim();
+    if (!questionText) {
+      await storePromise;
+      await sendTelegramMessage(chatId, 'Usage: /ask <your question>', lovableKey, telegramKey, messageId);
+      return;
+    }
+  } else if (replyToMessageId) {
+    const { data: conv } = await supabase
+      .from('telegram_conversations')
+      .select('id')
+      .eq('chat_id', chatId)
+      .eq('bot_message_id', replyToMessageId)
+      .single();
+
+    if (conv) {
+      shouldProcess = true;
+      questionText = text.trim();
+      parentConversationId = conv.id;
+    }
+  }
+
+  if (!shouldProcess || !questionText) {
+    await storePromise;
+    return;
+  }
+
+  // Fire typing indicator immediately (don't await)
+  const typingPromise = sendChatAction(chatId, 'typing', lovableKey, telegramKey);
+
+  // Build history and call AI concurrently with typing + store
+  const [history] = await Promise.all([
+    getConversationHistory(supabase, chatId, userId, parentConversationId),
+    typingPromise,
+    storePromise,
+  ]);
+
+  // Keep sending typing every 4s during AI call (Telegram typing expires after 5s)
+  const typingInterval = setInterval(() => {
+    sendChatAction(chatId, 'typing', lovableKey, telegramKey);
+  }, 4000);
+
+  try {
+    const aiResponse = await callAI(questionText, history, lovableKey);
+
+    clearInterval(typingInterval);
+
+    const sentMessage = await sendTelegramMessage(chatId, aiResponse, lovableKey, telegramKey, messageId);
+
+    // Store conversation + mark processed + log concurrently
+    const afterPromises = [
+      supabase.from('telegram_messages').update({ processed: true }).eq('update_id', update.update_id),
+      supabase.from('telegram_bot_logs').insert({
+        chat_id: chatId,
+        message_id: messageId,
+        action: isAskCommand ? 'ask_command' : 'reply_followup',
+        details: { username, question: questionText, response_length: aiResponse.length },
+      }),
+    ];
+
+    if (sentMessage) {
+      afterPromises.push(
+        supabase.from('telegram_conversations').insert({
+          chat_id: chatId,
+          user_id: userId,
+          bot_message_id: sentMessage.message_id,
+          user_message_id: messageId,
+          user_text: questionText,
+          bot_response: aiResponse,
+          parent_conversation_id: parentConversationId,
+        })
+      );
+    }
+
+    await Promise.all(afterPromises);
+  } catch (e) {
+    clearInterval(typingInterval);
+    console.error('Process update error:', e);
+  }
+}
 
 async function sendChatAction(chatId: number, action: string, lovableKey: string, telegramKey: string) {
   try {
@@ -199,26 +224,17 @@ async function sendChatAction(chatId: number, action: string, lovableKey: string
       },
       body: JSON.stringify({ chat_id: chatId, action }),
     });
-  } catch (e) {
-    console.error('sendChatAction error:', e);
-  }
+  } catch (e) { /* silent */ }
 }
 
 async function sendTelegramMessage(chatId: number, text: string, lovableKey: string, telegramKey: string, replyToMessageId?: number) {
   try {
-    // Telegram has a 4096 char limit per message
     const chunks = splitMessage(text, 4000);
     let lastSent = null;
 
     for (const chunk of chunks) {
-      const body: any = {
-        chat_id: chatId,
-        text: chunk,
-        parse_mode: 'Markdown',
-      };
-      if (replyToMessageId && !lastSent) {
-        body.reply_to_message_id = replyToMessageId;
-      }
+      const body: any = { chat_id: chatId, text: chunk, parse_mode: 'Markdown' };
+      if (replyToMessageId && !lastSent) body.reply_to_message_id = replyToMessageId;
 
       const response = await fetch(`${GATEWAY_URL}/sendMessage`, {
         method: 'POST',
@@ -232,7 +248,6 @@ async function sendTelegramMessage(chatId: number, text: string, lovableKey: str
 
       const data = await response.json();
       if (!response.ok) {
-        // Retry without parse_mode if Markdown fails
         body.parse_mode = undefined;
         const retry = await fetch(`${GATEWAY_URL}/sendMessage`, {
           method: 'POST',
@@ -261,10 +276,7 @@ function splitMessage(text: string, maxLen: number): string[] {
   const chunks: string[] = [];
   let remaining = text;
   while (remaining.length > 0) {
-    if (remaining.length <= maxLen) {
-      chunks.push(remaining);
-      break;
-    }
+    if (remaining.length <= maxLen) { chunks.push(remaining); break; }
     let splitAt = remaining.lastIndexOf('\n', maxLen);
     if (splitAt === -1 || splitAt < maxLen / 2) splitAt = maxLen;
     chunks.push(remaining.slice(0, splitAt));
@@ -274,11 +286,8 @@ function splitMessage(text: string, maxLen: number): string[] {
 }
 
 async function getConversationHistory(supabase: any, chatId: number, userId: number, parentConversationId: string | null): Promise<Array<{role: string, content: string}>> {
-  const history: Array<{role: string, content: string}> = [];
+  if (!parentConversationId) return [];
 
-  if (!parentConversationId) return history;
-
-  // Walk up the conversation chain (max 10 turns)
   let currentId: string | null = parentConversationId;
   const chain: any[] = [];
 
@@ -288,17 +297,16 @@ async function getConversationHistory(supabase: any, chatId: number, userId: num
       .select('*')
       .eq('id', currentId)
       .single();
-
     if (!conv) break;
     chain.unshift(conv);
     currentId = conv.parent_conversation_id;
   }
 
+  const history: Array<{role: string, content: string}> = [];
   for (const conv of chain) {
     if (conv.user_text) history.push({ role: 'user', content: conv.user_text });
     if (conv.bot_response) history.push({ role: 'assistant', content: conv.bot_response });
   }
-
   return history;
 }
 
@@ -321,7 +329,7 @@ Absolute Mode. Eliminate: emojis, filler, hype, soft asks, conversational transi
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-3-flash-preview',
+        model: 'google/gemini-2.5-flash-lite',
         messages,
       }),
     });
