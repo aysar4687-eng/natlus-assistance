@@ -60,6 +60,15 @@ serve(async (req) => {
     if (timeout < 1) break;
 
     try {
+      const now = Date.now();
+      if (now - lastHeartbeat >= POLLER_HEARTBEAT_MS) {
+        await supabase
+          .from('telegram_bot_state')
+          .update({ updated_at: new Date(now).toISOString() })
+          .eq('id', 1);
+        lastHeartbeat = now;
+      }
+
       const response = await fetch(`${GATEWAY_URL}/getUpdates`, {
         method: 'POST',
         headers: {
@@ -76,8 +85,11 @@ serve(async (req) => {
 
       const data = await response.json();
       if (!response.ok) {
+        if (data?.error_code === 409) {
+          console.warn('Telegram getUpdates conflict: another poller is active. Exiting this run.');
+          break;
+        }
         console.error('Telegram getUpdates error:', data);
-        // Don't exit — retry after brief pause
         await new Promise(r => setTimeout(r, 1000));
         continue;
       }
@@ -94,10 +106,12 @@ serve(async (req) => {
 
       // Advance offset immediately
       const newOffset = Math.max(...updates.map((u: any) => u.update_id)) + 1;
+      const offsetUpdateTime = new Date().toISOString();
       await supabase.from('telegram_bot_state')
-        .update({ update_offset: newOffset, updated_at: new Date().toISOString() })
+        .update({ update_offset: newOffset, updated_at: offsetUpdateTime })
         .eq('id', 1);
       currentOffset = newOffset;
+      lastHeartbeat = Date.now();
 
     } catch (err) {
       console.error('Poll loop error:', err);
