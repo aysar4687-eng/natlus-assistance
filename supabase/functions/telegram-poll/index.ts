@@ -85,7 +85,8 @@ serve(async (req) => {
 
       const data = await response.json();
       if (!response.ok) {
-        if (data?.error_code === 409) {
+        const isConflict409 = String(data?.error_code) === '409' || `${data?.description ?? ''}`.includes('terminated by other getUpdates request');
+        if (isConflict409) {
           console.warn('Telegram getUpdates conflict: another poller is active. Exiting this run.');
           break;
         }
