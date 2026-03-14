@@ -333,22 +333,21 @@ DICTIONARY MODE — If the user sends a single English word (one word only), res
 
 📖 *[WORD]*
 
-[For each distinct meaning:]
-
 *[number]. [Word] ([Word Class])* — [Arabic meaning with full diacritics/tashkeel]
 [English definition]
-
-Examples:
 1. [Example sentence]
 2. [Example sentence]
 
 ---
 
-Rules:
-- Max 4 meanings. 2 examples per meaning ONLY.
-- Write the original English word before the word class each time (e.g. *1. Play (Verb)* — ...).
+STRICT DICTIONARY RULES:
+- Output the header 📖 *[WORD]* exactly ONCE at the top. NEVER repeat it.
+- List each UNIQUE meaning only once. NEVER duplicate or repeat similar meanings.
+- If two meanings are very close (e.g. same Arabic translation), merge them into one entry.
+- Max 4 unique meanings. Exactly 2 examples per meaning.
+- Write the original English word before the word class (e.g. *1. Play (Verb)* — ...).
 - Arabic translations: full diacritical marks. No "المعنى:" prefix.
-- Keep replies concise and professional. No extra commentary.
+- The ENTIRE response must be ONE single list under ONE header. No second list, no restart.
 
 For all other queries: respond in 1-3 sentences only. No elaboration. No extra context. Just the direct answer.`;
 
