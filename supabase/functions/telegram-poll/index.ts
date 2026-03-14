@@ -348,6 +348,48 @@ function splitMessage(text: string, maxLen: number): string[] {
   return chunks;
 }
 
+function normalizeDictionaryResponse(raw: string, word: string): string {
+  const text = raw.replace(/\r/g, '').trim();
+  const entryRegex = /\*\s*\d+\.\s*([^\(\n]+?)\s*\(([^)\n]+)\)\*\s*—\s*([^\n]+)\n([\s\S]*?)(?=\n\*\s*\d+\.\s*|\n📖\s*\*|$)/g;
+  const uniqueEntries: Array<{ word: string; wordClass: string; arabic: string; definition: string; examples: string[]; key: string }> = [];
+
+  let match: RegExpExecArray | null;
+  while ((match = entryRegex.exec(text)) !== null) {
+    const entryWord = match[1].trim() || word;
+    const wordClass = match[2].trim() || 'Noun';
+    const arabic = match[3].trim();
+    const bodyLines = match[4].split('\n').map(l => l.trim()).filter(Boolean);
+    const definition = bodyLines.find(line => !/^\d+\./.test(line)) || '';
+    const examples = bodyLines
+      .filter(line => /^\d+\./.test(line))
+      .map(line => line.replace(/^\d+\.\s*/, '').trim())
+      .filter(Boolean)
+      .slice(0, 2);
+
+    const key = `${arabic.toLowerCase()}|${definition.toLowerCase()}`;
+    const hasDuplicate = uniqueEntries.some(entry => entry.key === key || entry.arabic.toLowerCase() === arabic.toLowerCase());
+    if (!hasDuplicate) {
+      uniqueEntries.push({ word: entryWord, wordClass, arabic, definition, examples, key });
+    }
+  }
+
+  if (uniqueEntries.length === 0) return text.slice(0, 800);
+
+  const entries = uniqueEntries.slice(0, 4);
+  const lines: string[] = [`📖 *${word}*`, ''];
+
+  entries.forEach((entry, index) => {
+    lines.push(`*${index + 1}. ${entry.word} (${entry.wordClass})* — ${entry.arabic}`);
+    if (entry.definition) lines.push(entry.definition);
+    lines.push(`1. ${entry.examples[0] || 'N/A'}`);
+    lines.push(`2. ${entry.examples[1] || entry.examples[0] || 'N/A'}`);
+    if (index < entries.length - 1) lines.push('');
+  });
+
+  const result = lines.join('\n').trim();
+  return result.length > 800 ? `${result.slice(0, 797)}...` : result;
+}
+
 async function getConversationHistory(supabase: any, chatId: number, userId: number, parentConversationId: string | null): Promise<Array<{role: string, content: string}>> {
   if (!parentConversationId) return [];
 
