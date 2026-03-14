@@ -4,6 +4,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 const GATEWAY_URL = 'https://connector-gateway.lovable.dev/telegram';
 const MAX_RUNTIME_MS = 58_000; // Push closer to 60s limit
 const MIN_REMAINING_MS = 2_000; // Minimal buffer
+const POLLER_LEASE_STALE_MS = 9_000;
+const POLLER_HEARTBEAT_MS = 3_000;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -37,7 +39,15 @@ serve(async (req) => {
     return new Response(JSON.stringify({ error: stateErr.message }), { status: 500, headers: corsHeaders });
   }
 
+  const leaseAcquired = await acquirePollerLease(supabase);
+  if (!leaseAcquired) {
+    return new Response(JSON.stringify({ ok: true, skipped: 'another poller instance is active' }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
   let currentOffset = state.update_offset;
+  let lastHeartbeat = 0;
 
   while (true) {
     const elapsed = Date.now() - startTime;
@@ -50,6 +60,15 @@ serve(async (req) => {
     if (timeout < 1) break;
 
     try {
+      const now = Date.now();
+      if (now - lastHeartbeat >= POLLER_HEARTBEAT_MS) {
+        await supabase
+          .from('telegram_bot_state')
+          .update({ updated_at: new Date(now).toISOString() })
+          .eq('id', 1);
+        lastHeartbeat = now;
+      }
+
       const response = await fetch(`${GATEWAY_URL}/getUpdates`, {
         method: 'POST',
         headers: {
@@ -66,8 +85,12 @@ serve(async (req) => {
 
       const data = await response.json();
       if (!response.ok) {
+        const isConflict409 = String(data?.error_code) === '409' || `${data?.description ?? ''}`.includes('terminated by other getUpdates request');
+        if (isConflict409) {
+          console.warn('Telegram getUpdates conflict: another poller is active. Exiting this run.');
+          break;
+        }
         console.error('Telegram getUpdates error:', data);
-        // Don't exit — retry after brief pause
         await new Promise(r => setTimeout(r, 1000));
         continue;
       }
@@ -84,10 +107,12 @@ serve(async (req) => {
 
       // Advance offset immediately
       const newOffset = Math.max(...updates.map((u: any) => u.update_id)) + 1;
+      const offsetUpdateTime = new Date().toISOString();
       await supabase.from('telegram_bot_state')
-        .update({ update_offset: newOffset, updated_at: new Date().toISOString() })
+        .update({ update_offset: newOffset, updated_at: offsetUpdateTime })
         .eq('id', 1);
       currentOffset = newOffset;
+      lastHeartbeat = Date.now();
 
     } catch (err) {
       console.error('Poll loop error:', err);
@@ -100,6 +125,32 @@ serve(async (req) => {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 });
+
+async function acquirePollerLease(supabase: any): Promise<boolean> {
+  try {
+    const now = Date.now();
+    const nowIso = new Date(now).toISOString();
+    const staleBeforeIso = new Date(now - POLLER_LEASE_STALE_MS).toISOString();
+
+    const { data, error } = await supabase
+      .from('telegram_bot_state')
+      .update({ updated_at: nowIso })
+      .eq('id', 1)
+      .lt('updated_at', staleBeforeIso)
+      .select('id')
+      .maybeSingle();
+
+    if (error) {
+      console.error('Poller lease acquire error:', error);
+      return false;
+    }
+
+    return !!data;
+  } catch (error) {
+    console.error('Poller lease acquire exception:', error);
+    return false;
+  }
+}
 
 async function processUpdate(update: any, supabase: any, lovableKey: string, telegramKey: string) {
   const msg = update.message;
@@ -176,10 +227,14 @@ async function processUpdate(update: any, supabase: any, lovableKey: string, tel
 
   try {
     const aiResponse = await callAI(questionText, history, lovableKey);
+    const isDictionaryQuery = /^[A-Za-z][A-Za-z-]*$/.test(questionText.trim());
+    const finalResponse = isDictionaryQuery
+      ? normalizeDictionaryResponse(aiResponse, questionText.trim())
+      : aiResponse;
 
     clearInterval(typingInterval);
 
-    const sentMessage = await sendTelegramMessage(chatId, aiResponse, lovableKey, telegramKey, messageId);
+    const sentMessage = await sendTelegramMessage(chatId, finalResponse, lovableKey, telegramKey, messageId);
 
     // Store conversation + mark processed + log concurrently
     const afterPromises = [
@@ -188,7 +243,7 @@ async function processUpdate(update: any, supabase: any, lovableKey: string, tel
         chat_id: chatId,
         message_id: messageId,
         action: isAskCommand ? 'ask_command' : 'reply_followup',
-        details: { username, question: questionText, response_length: aiResponse.length },
+        details: { username, question: questionText, response_length: finalResponse.length },
       }),
     ];
 
@@ -200,7 +255,7 @@ async function processUpdate(update: any, supabase: any, lovableKey: string, tel
           bot_message_id: sentMessage.message_id,
           user_message_id: messageId,
           user_text: questionText,
-          bot_response: aiResponse,
+          bot_response: finalResponse,
           parent_conversation_id: parentConversationId,
         })
       );
@@ -291,6 +346,48 @@ function splitMessage(text: string, maxLen: number): string[] {
     remaining = remaining.slice(splitAt);
   }
   return chunks;
+}
+
+function normalizeDictionaryResponse(raw: string, word: string): string {
+  const text = raw.replace(/\r/g, '').trim();
+  const entryRegex = /\*\s*\d+\.\s*([^\(\n]+?)\s*\(([^)\n]+)\)\*\s*—\s*([^\n]+)\n([\s\S]*?)(?=\n\*\s*\d+\.\s*|\n📖\s*\*|$)/g;
+  const uniqueEntries: Array<{ word: string; wordClass: string; arabic: string; definition: string; examples: string[]; key: string }> = [];
+
+  let match: RegExpExecArray | null;
+  while ((match = entryRegex.exec(text)) !== null) {
+    const entryWord = match[1].trim() || word;
+    const wordClass = match[2].trim() || 'Noun';
+    const arabic = match[3].trim();
+    const bodyLines = match[4].split('\n').map(l => l.trim()).filter(Boolean);
+    const definition = bodyLines.find(line => !/^\d+\./.test(line)) || '';
+    const examples = bodyLines
+      .filter(line => /^\d+\./.test(line))
+      .map(line => line.replace(/^\d+\.\s*/, '').trim())
+      .filter(Boolean)
+      .slice(0, 2);
+
+    const key = `${arabic.toLowerCase()}|${definition.toLowerCase()}`;
+    const hasDuplicate = uniqueEntries.some(entry => entry.key === key || entry.arabic.toLowerCase() === arabic.toLowerCase());
+    if (!hasDuplicate) {
+      uniqueEntries.push({ word: entryWord, wordClass, arabic, definition, examples, key });
+    }
+  }
+
+  if (uniqueEntries.length === 0) return text.slice(0, 800);
+
+  const entries = uniqueEntries.slice(0, 4);
+  const lines: string[] = [`📖 *${word}*`, ''];
+
+  entries.forEach((entry, index) => {
+    lines.push(`*${index + 1}. ${entry.word} (${entry.wordClass})* — ${entry.arabic}`);
+    if (entry.definition) lines.push(entry.definition);
+    lines.push(`1. ${entry.examples[0] || 'N/A'}`);
+    lines.push(`2. ${entry.examples[1] || entry.examples[0] || 'N/A'}`);
+    if (index < entries.length - 1) lines.push('');
+  });
+
+  const result = lines.join('\n').trim();
+  return result.length > 800 ? `${result.slice(0, 797)}...` : result;
 }
 
 async function getConversationHistory(supabase: any, chatId: number, userId: number, parentConversationId: string | null): Promise<Array<{role: string, content: string}>> {
