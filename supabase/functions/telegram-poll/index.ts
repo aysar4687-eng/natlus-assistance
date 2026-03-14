@@ -350,7 +350,7 @@ Rules:
 - Arabic translations: full diacritical marks. No "المعنى:" prefix.
 - Keep replies concise and professional. No extra commentary.
 
-For all other queries (multiple words, sentences, questions), respond concisely as an AI assistant. Maximum 2-3 short paragraphs.`;
+For all other queries: respond in 1-3 sentences only. No elaboration. No extra context. Just the direct answer.`;
 
 
   const messages = [
