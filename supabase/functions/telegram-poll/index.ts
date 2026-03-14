@@ -4,6 +4,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 const GATEWAY_URL = 'https://connector-gateway.lovable.dev/telegram';
 const MAX_RUNTIME_MS = 58_000; // Push closer to 60s limit
 const MIN_REMAINING_MS = 2_000; // Minimal buffer
+const POLLER_LEASE_STALE_MS = 9_000;
+const POLLER_HEARTBEAT_MS = 3_000;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -37,7 +39,15 @@ serve(async (req) => {
     return new Response(JSON.stringify({ error: stateErr.message }), { status: 500, headers: corsHeaders });
   }
 
+  const leaseAcquired = await acquirePollerLease(supabase);
+  if (!leaseAcquired) {
+    return new Response(JSON.stringify({ ok: true, skipped: 'another poller instance is active' }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
   let currentOffset = state.update_offset;
+  let lastHeartbeat = 0;
 
   while (true) {
     const elapsed = Date.now() - startTime;
