@@ -226,10 +226,14 @@ async function processUpdate(update: any, supabase: any, lovableKey: string, tel
 
   try {
     const aiResponse = await callAI(questionText, history, lovableKey);
+    const isDictionaryQuery = /^[A-Za-z][A-Za-z-]*$/.test(questionText.trim());
+    const finalResponse = isDictionaryQuery
+      ? normalizeDictionaryResponse(aiResponse, questionText.trim())
+      : aiResponse;
 
     clearInterval(typingInterval);
 
-    const sentMessage = await sendTelegramMessage(chatId, aiResponse, lovableKey, telegramKey, messageId);
+    const sentMessage = await sendTelegramMessage(chatId, finalResponse, lovableKey, telegramKey, messageId);
 
     // Store conversation + mark processed + log concurrently
     const afterPromises = [
@@ -238,7 +242,7 @@ async function processUpdate(update: any, supabase: any, lovableKey: string, tel
         chat_id: chatId,
         message_id: messageId,
         action: isAskCommand ? 'ask_command' : 'reply_followup',
-        details: { username, question: questionText, response_length: aiResponse.length },
+        details: { username, question: questionText, response_length: finalResponse.length },
       }),
     ];
 
@@ -250,7 +254,7 @@ async function processUpdate(update: any, supabase: any, lovableKey: string, tel
           bot_message_id: sentMessage.message_id,
           user_message_id: messageId,
           user_text: questionText,
-          bot_response: aiResponse,
+          bot_response: finalResponse,
           parent_conversation_id: parentConversationId,
         })
       );
