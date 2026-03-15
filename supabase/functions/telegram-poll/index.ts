@@ -283,8 +283,11 @@ async function sendChatAction(chatId: number, action: string, lovableKey: string
 }
 
 function convertToTelegramMarkdown(text: string): string {
-  // Convert **bold** to *bold* for Telegram Markdown
   return text.replace(/\*\*(.+?)\*\*/g, '*$1*');
+}
+
+function isHtmlFormatted(text: string): boolean {
+  return /<\/?[a-z][\s\S]*>/i.test(text);
 }
 
 async function sendTelegramMessage(chatId: number, text: string, lovableKey: string, telegramKey: string, replyToMessageId?: number) {
