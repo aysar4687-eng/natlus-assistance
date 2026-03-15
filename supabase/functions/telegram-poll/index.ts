@@ -415,7 +415,7 @@ async function getConversationHistory(supabase: any, chatId: number, userId: num
   let currentId: string | null = parentConversationId;
   const chain: any[] = [];
 
-  for (let i = 0; i < 10 && currentId; i++) {
+  for (let i = 0; i < 5 && currentId; i++) {
     const { data: conv } = await supabase
       .from('telegram_conversations')
       .select('*')
