@@ -446,23 +446,21 @@ CRITICAL RULES FOR ALL RESPONSES:
 
 DICTIONARY MODE — If the user sends a single English word (one word only), respond STRICTLY in this format:
 
-📖 *[WORD]*
+📖 [WORD]
 
-*[number]. [Word] ([Word Class])* — [Arabic meaning with full diacritics/tashkeel]
+1. [Word] ([Part of Speech]) — [Arabic meaning with full diacritics]
 [English definition]
-1. [Example sentence]
-2. [Example sentence]
-
----
+• [Example sentence with the word used naturally]
+• [Another example sentence]
 
 STRICT DICTIONARY RULES:
-- Output the header 📖 *[WORD]* exactly ONCE at the top. NEVER repeat it.
+- Output the header 📖 [WORD] exactly ONCE at the top. NEVER repeat it.
 - List each UNIQUE meaning only once. NEVER duplicate or repeat similar meanings.
 - If two meanings are very close (e.g. same Arabic translation), merge them into one entry.
-- Max 4 unique meanings. Exactly 2 examples per meaning.
-- Write the original English word before the word class (e.g. *1. Play (Verb)* — ...).
-- Arabic translations: full diacritical marks. No "المعنى:" prefix.
-- The ENTIRE response must be ONE single list under ONE header. No second list, no restart.
+- Max 4 unique meanings. Exactly 2 example sentences per meaning using bullet points (•).
+- Do NOT number example sentences. Use • bullets only.
+- Arabic translations: full diacritical marks. No prefix.
+- The ENTIRE response must be ONE single list under ONE header.
 
 For all other queries: respond in 1-3 sentences only. No elaboration. No extra context. Just the direct answer.`;
 
