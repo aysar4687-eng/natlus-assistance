@@ -354,40 +354,53 @@ function splitMessage(text: string, maxLen: number): string[] {
 }
 
 function normalizeDictionaryResponse(raw: string, word: string): string {
-  const text = raw.replace(/\r/g, '').trim();
-  const entryRegex = /\*\s*\d+\.\s*([^\(\n]+?)\s*\(([^)\n]+)\)\*\s*—\s*([^\n]+)\n([\s\S]*?)(?=\n\*\s*\d+\.\s*|\n📖\s*\*|$)/g;
-  const uniqueEntries: Array<{ word: string; wordClass: string; arabic: string; definition: string; examples: string[]; key: string }> = [];
+  // Strip any existing HTML/Markdown and re-parse entries
+  const text = raw.replace(/\r/g, '').replace(/<[^>]+>/g, '').replace(/\*/g, '').trim();
+  
+  // Match patterns like: number. Word (Part of Speech) — Arabic
+  const entryRegex = /(\d+)\.\s*([^\(\n]+?)\s*\(([^)\n]+)\)\s*[—\-–]\s*([^\n]+)\n([\s\S]*?)(?=\n\d+\.\s*[A-Za-z]|\n📖|$)/g;
+  const uniqueEntries: Array<{ wordText: string; wordClass: string; arabic: string; definition: string; examples: string[]; key: string }> = [];
 
   let match: RegExpExecArray | null;
   while ((match = entryRegex.exec(text)) !== null) {
-    const entryWord = match[1].trim() || word;
-    const wordClass = match[2].trim() || 'Noun';
-    const arabic = match[3].trim();
-    const bodyLines = match[4].split('\n').map(l => l.trim()).filter(Boolean);
-    const definition = bodyLines.find(line => !/^\d+\./.test(line)) || '';
+    const wordText = match[2].trim() || word;
+    const wordClass = match[3].trim();
+    const arabic = match[4].trim();
+    const bodyLines = match[5].split('\n').map(l => l.trim()).filter(Boolean);
+    
+    // First non-bullet/non-numbered line is the definition
+    const definition = bodyLines.find(line => !/^[\d•\-]/.test(line)) || '';
+    // Collect examples from bullet points or numbered lines within body
     const examples = bodyLines
-      .filter(line => /^\d+\./.test(line))
-      .map(line => line.replace(/^\d+\.\s*/, '').trim())
+      .filter(line => /^[\d•\-]/.test(line))
+      .map(line => line.replace(/^[\d•\-]+[\.\)]*\s*/, '').trim())
       .filter(Boolean)
       .slice(0, 2);
 
-    const key = `${arabic.toLowerCase()}|${definition.toLowerCase()}`;
-    const hasDuplicate = uniqueEntries.some(entry => entry.key === key || entry.arabic.toLowerCase() === arabic.toLowerCase());
+    const key = arabic.toLowerCase().replace(/[\u064B-\u065F\u0670]/g, ''); // normalize without diacritics for dedup
+    const hasDuplicate = uniqueEntries.some(entry => {
+      const entryKey = entry.arabic.toLowerCase().replace(/[\u064B-\u065F\u0670]/g, '');
+      return entryKey === key;
+    });
     if (!hasDuplicate) {
-      uniqueEntries.push({ word: entryWord, wordClass, arabic, definition, examples, key });
+      uniqueEntries.push({ wordText, wordClass, arabic, definition, examples, key });
     }
   }
 
-  if (uniqueEntries.length === 0) return text.slice(0, 800);
+  if (uniqueEntries.length === 0) return raw.slice(0, 800);
 
   const entries = uniqueEntries.slice(0, 4);
-  const lines: string[] = [`📖 *${word}*`, ''];
+  const lines: string[] = [`📖 <b>${word}</b>`, ''];
 
   entries.forEach((entry, index) => {
-    lines.push(`*${index + 1}. ${entry.word} (${entry.wordClass})* — ${entry.arabic}`);
+    lines.push(`${index + 1}. <b><u>${entry.wordText}</u></b> (${entry.wordClass}) — ${entry.arabic}`);
     if (entry.definition) lines.push(entry.definition);
-    lines.push(`1. ${entry.examples[0] || 'N/A'}`);
-    lines.push(`2. ${entry.examples[1] || entry.examples[0] || 'N/A'}`);
+    entry.examples.forEach(ex => {
+      // Bold the target word in examples
+      const regex = new RegExp(`\\b(${word})\\b`, 'gi');
+      const formatted = ex.replace(regex, '<b>$1</b>');
+      lines.push(`• ${formatted}`);
+    });
     if (index < entries.length - 1) lines.push('');
   });
 
