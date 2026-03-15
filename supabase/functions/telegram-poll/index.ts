@@ -292,12 +292,14 @@ function isHtmlFormatted(text: string): boolean {
 
 async function sendTelegramMessage(chatId: number, text: string, lovableKey: string, telegramKey: string, replyToMessageId?: number) {
   try {
-    const formattedText = convertToTelegramMarkdown(text);
+    const useHtml = isHtmlFormatted(text);
+    const formattedText = useHtml ? text : convertToTelegramMarkdown(text);
+    const parseMode = useHtml ? 'HTML' : 'Markdown';
     const chunks = splitMessage(formattedText, 4000);
     let lastSent = null;
 
     for (const chunk of chunks) {
-      const body: any = { chat_id: chatId, text: chunk, parse_mode: 'Markdown' };
+      const body: any = { chat_id: chatId, text: chunk, parse_mode: parseMode };
       if (replyToMessageId && !lastSent) body.reply_to_message_id = replyToMessageId;
 
       const response = await fetch(`${GATEWAY_URL}/sendMessage`, {
@@ -314,7 +316,7 @@ async function sendTelegramMessage(chatId: number, text: string, lovableKey: str
       if (!response.ok) {
         // Fallback: send without formatting
         body.parse_mode = undefined;
-        body.text = chunk.replace(/\*/g, '');
+        body.text = chunk.replace(/<[^>]+>/g, '').replace(/\*/g, '');
         const retry = await fetch(`${GATEWAY_URL}/sendMessage`, {
           method: 'POST',
           headers: {
