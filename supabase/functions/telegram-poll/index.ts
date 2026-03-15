@@ -283,18 +283,23 @@ async function sendChatAction(chatId: number, action: string, lovableKey: string
 }
 
 function convertToTelegramMarkdown(text: string): string {
-  // Convert **bold** to *bold* for Telegram Markdown
   return text.replace(/\*\*(.+?)\*\*/g, '*$1*');
+}
+
+function isHtmlFormatted(text: string): boolean {
+  return /<\/?[a-z][\s\S]*>/i.test(text);
 }
 
 async function sendTelegramMessage(chatId: number, text: string, lovableKey: string, telegramKey: string, replyToMessageId?: number) {
   try {
-    const formattedText = convertToTelegramMarkdown(text);
+    const useHtml = isHtmlFormatted(text);
+    const formattedText = useHtml ? text : convertToTelegramMarkdown(text);
+    const parseMode = useHtml ? 'HTML' : 'Markdown';
     const chunks = splitMessage(formattedText, 4000);
     let lastSent = null;
 
     for (const chunk of chunks) {
-      const body: any = { chat_id: chatId, text: chunk, parse_mode: 'Markdown' };
+      const body: any = { chat_id: chatId, text: chunk, parse_mode: parseMode };
       if (replyToMessageId && !lastSent) body.reply_to_message_id = replyToMessageId;
 
       const response = await fetch(`${GATEWAY_URL}/sendMessage`, {
@@ -311,7 +316,7 @@ async function sendTelegramMessage(chatId: number, text: string, lovableKey: str
       if (!response.ok) {
         // Fallback: send without formatting
         body.parse_mode = undefined;
-        body.text = chunk.replace(/\*/g, '');
+        body.text = chunk.replace(/<[^>]+>/g, '').replace(/\*/g, '');
         const retry = await fetch(`${GATEWAY_URL}/sendMessage`, {
           method: 'POST',
           headers: {
@@ -349,40 +354,53 @@ function splitMessage(text: string, maxLen: number): string[] {
 }
 
 function normalizeDictionaryResponse(raw: string, word: string): string {
-  const text = raw.replace(/\r/g, '').trim();
-  const entryRegex = /\*\s*\d+\.\s*([^\(\n]+?)\s*\(([^)\n]+)\)\*\s*—\s*([^\n]+)\n([\s\S]*?)(?=\n\*\s*\d+\.\s*|\n📖\s*\*|$)/g;
-  const uniqueEntries: Array<{ word: string; wordClass: string; arabic: string; definition: string; examples: string[]; key: string }> = [];
+  // Strip any existing HTML/Markdown and re-parse entries
+  const text = raw.replace(/\r/g, '').replace(/<[^>]+>/g, '').replace(/\*/g, '').trim();
+  
+  // Match patterns like: number. Word (Part of Speech) — Arabic
+  const entryRegex = /(\d+)\.\s*([^\(\n]+?)\s*\(([^)\n]+)\)\s*[—\-–]\s*([^\n]+)\n([\s\S]*?)(?=\n\d+\.\s*[A-Za-z]|\n📖|$)/g;
+  const uniqueEntries: Array<{ wordText: string; wordClass: string; arabic: string; definition: string; examples: string[]; key: string }> = [];
 
   let match: RegExpExecArray | null;
   while ((match = entryRegex.exec(text)) !== null) {
-    const entryWord = match[1].trim() || word;
-    const wordClass = match[2].trim() || 'Noun';
-    const arabic = match[3].trim();
-    const bodyLines = match[4].split('\n').map(l => l.trim()).filter(Boolean);
-    const definition = bodyLines.find(line => !/^\d+\./.test(line)) || '';
+    const wordText = match[2].trim() || word;
+    const wordClass = match[3].trim();
+    const arabic = match[4].trim();
+    const bodyLines = match[5].split('\n').map(l => l.trim()).filter(Boolean);
+    
+    // First non-bullet/non-numbered line is the definition
+    const definition = bodyLines.find(line => !/^[\d•\-]/.test(line)) || '';
+    // Collect examples from bullet points or numbered lines within body
     const examples = bodyLines
-      .filter(line => /^\d+\./.test(line))
-      .map(line => line.replace(/^\d+\.\s*/, '').trim())
+      .filter(line => /^[\d•\-]/.test(line))
+      .map(line => line.replace(/^[\d•\-]+[\.\)]*\s*/, '').trim())
       .filter(Boolean)
       .slice(0, 2);
 
-    const key = `${arabic.toLowerCase()}|${definition.toLowerCase()}`;
-    const hasDuplicate = uniqueEntries.some(entry => entry.key === key || entry.arabic.toLowerCase() === arabic.toLowerCase());
+    const key = arabic.toLowerCase().replace(/[\u064B-\u065F\u0670]/g, ''); // normalize without diacritics for dedup
+    const hasDuplicate = uniqueEntries.some(entry => {
+      const entryKey = entry.arabic.toLowerCase().replace(/[\u064B-\u065F\u0670]/g, '');
+      return entryKey === key;
+    });
     if (!hasDuplicate) {
-      uniqueEntries.push({ word: entryWord, wordClass, arabic, definition, examples, key });
+      uniqueEntries.push({ wordText, wordClass, arabic, definition, examples, key });
     }
   }
 
-  if (uniqueEntries.length === 0) return text.slice(0, 800);
+  if (uniqueEntries.length === 0) return raw.slice(0, 800);
 
   const entries = uniqueEntries.slice(0, 4);
-  const lines: string[] = [`📖 *${word}*`, ''];
+  const lines: string[] = [`📖 <b>${word}</b>`, ''];
 
   entries.forEach((entry, index) => {
-    lines.push(`*${index + 1}. ${entry.word} (${entry.wordClass})* — ${entry.arabic}`);
+    lines.push(`${index + 1}. <b><u>${entry.wordText}</u></b> (${entry.wordClass}) — ${entry.arabic}`);
     if (entry.definition) lines.push(entry.definition);
-    lines.push(`1. ${entry.examples[0] || 'N/A'}`);
-    lines.push(`2. ${entry.examples[1] || entry.examples[0] || 'N/A'}`);
+    entry.examples.forEach(ex => {
+      // Bold the target word in examples
+      const regex = new RegExp(`\\b(${word})\\b`, 'gi');
+      const formatted = ex.replace(regex, '<b>$1</b>');
+      lines.push(`• ${formatted}`);
+    });
     if (index < entries.length - 1) lines.push('');
   });
 
@@ -428,23 +446,21 @@ CRITICAL RULES FOR ALL RESPONSES:
 
 DICTIONARY MODE — If the user sends a single English word (one word only), respond STRICTLY in this format:
 
-📖 *[WORD]*
+📖 [WORD]
 
-*[number]. [Word] ([Word Class])* — [Arabic meaning with full diacritics/tashkeel]
+1. [Word] ([Part of Speech]) — [Arabic meaning with full diacritics]
 [English definition]
-1. [Example sentence]
-2. [Example sentence]
-
----
+• [Example sentence with the word used naturally]
+• [Another example sentence]
 
 STRICT DICTIONARY RULES:
-- Output the header 📖 *[WORD]* exactly ONCE at the top. NEVER repeat it.
+- Output the header 📖 [WORD] exactly ONCE at the top. NEVER repeat it.
 - List each UNIQUE meaning only once. NEVER duplicate or repeat similar meanings.
 - If two meanings are very close (e.g. same Arabic translation), merge them into one entry.
-- Max 4 unique meanings. Exactly 2 examples per meaning.
-- Write the original English word before the word class (e.g. *1. Play (Verb)* — ...).
-- Arabic translations: full diacritical marks. No "المعنى:" prefix.
-- The ENTIRE response must be ONE single list under ONE header. No second list, no restart.
+- Max 4 unique meanings. Exactly 2 example sentences per meaning using bullet points (•).
+- Do NOT number example sentences. Use • bullets only.
+- Arabic translations: full diacritical marks. No prefix.
+- The ENTIRE response must be ONE single list under ONE header.
 
 For all other queries: respond in 1-3 sentences only. No elaboration. No extra context. Just the direct answer.`;
 
