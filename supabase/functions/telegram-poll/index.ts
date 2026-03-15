@@ -463,6 +463,22 @@ STRICT DICTIONARY RULES:
 - Arabic translations: full diacritical marks. No prefix.
 - The ENTIRE response must be ONE single list under ONE header.
 
+COMPARISON MODE — When comparing two or more words/terms/concepts:
+- NEVER write a continuous paragraph. Use a structured, line-separated format.
+- Each keyword MUST start on a NEW LINE, formatted as <b><u>Keyword</u></b>:
+- After each keyword line, write its meaning/explanation on the same or next line.
+- Add a blank line between each keyword block for clarity.
+- End with a short summary line showing the key difference.
+- Example format:
+
+<b><u>Affect</u></b>: (verb) to influence something.
+• Stress can <b>affect</b> your health.
+
+<b><u>Effect</u></b>: (noun) a result or outcome.
+• The <b>effect</b> was immediate.
+
+Summary: <b><u>Affect</u></b> = verb (action), <b><u>Effect</u></b> = noun (result).
+
 For all other queries: respond in 1-3 sentences only. No elaboration. No extra context. Just the direct answer.`;
 
 
