@@ -270,7 +270,7 @@ async function processUpdate(update: any, supabase: any, lovableKey: string, tel
 
 async function sendChatAction(chatId: number, action: string, lovableKey: string, telegramKey: string) {
   try {
-    await fetch(`${GATEWAY_URL}/sendChatAction`, {
+    const res = await fetch(`${GATEWAY_URL}/sendChatAction`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${lovableKey}`,
@@ -279,6 +279,7 @@ async function sendChatAction(chatId: number, action: string, lovableKey: string
       },
       body: JSON.stringify({ chat_id: chatId, action }),
     });
+    await res.text(); // Must consume body in Deno to prevent resource leak
   } catch (e) { /* silent */ }
 }
 
