@@ -165,6 +165,20 @@ async function processUpdate(update: any, supabase: any, lovableKey: string, tel
   const isAskCommand = text.startsWith('/ask');
   const isStartCommand = text.startsWith('/start');
 
+  // Store message (fire and forget for speed)
+  const storePromise = supabase.from('telegram_messages').upsert({
+    update_id: update.update_id,
+    chat_id: chatId,
+    message_id: messageId,
+    user_id: userId,
+    username,
+    text,
+    reply_to_message_id: replyToMessageId,
+    is_bot_command: isAskCommand || isStartCommand,
+    raw_update: update,
+    processed: false,
+  }, { onConflict: 'update_id' });
+
   // Handle /start command — send welcome message
   if (isStartCommand) {
     await storePromise;
@@ -203,20 +217,6 @@ All responses are concise and include Arabic translations with full diacritics.`
     await sendTelegramMessage(chatId, welcomeText, lovableKey, telegramKey, messageId);
     return;
   }
-
-  // Store message (fire and forget for speed)
-  const storePromise = supabase.from('telegram_messages').upsert({
-    update_id: update.update_id,
-    chat_id: chatId,
-    message_id: messageId,
-    user_id: userId,
-    username,
-    text,
-    reply_to_message_id: replyToMessageId,
-    is_bot_command: isAskCommand,
-    raw_update: update,
-    processed: false,
-  }, { onConflict: 'update_id' });
 
   let shouldProcess = false;
   let questionText = '';
