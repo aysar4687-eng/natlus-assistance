@@ -163,6 +163,46 @@ async function processUpdate(update: any, supabase: any, lovableKey: string, tel
   const messageId = msg.message_id;
   const replyToMessageId = msg.reply_to_message?.message_id;
   const isAskCommand = text.startsWith('/ask');
+  const isStartCommand = text.startsWith('/start');
+
+  // Handle /start command — send welcome message
+  if (isStartCommand) {
+    await storePromise;
+    const isPrivateChat = msg.chat.type === 'private';
+    const welcomeText = isPrivateChat
+      ? `🤖 <b>Welcome to Natlus Assistance!</b>
+
+I'm your AI-powered language assistant. Here's what I can do:
+
+📖 <b>Word Definitions</b>
+Send any single English word and I'll provide its meanings, translations, and example sentences.
+
+🔍 <b>Ask Anything</b>
+Use <code>/ask</code> followed by your question:
+<code>/ask What is the difference between affect and effect?</code>
+
+💬 <b>Follow-up Conversations</b>
+Reply directly to any of my messages to continue the conversation with context.
+
+⚡ Responses are concise, formatted, and include Arabic translations with full diacritics when relevant.
+
+Start by sending a word or use <code>/ask</code> to begin!`
+      : `🤖 <b>Natlus Assistance is active!</b>
+
+Here's how to use me in this group:
+
+📖 <b>Word Lookup</b> — Send <code>/ask</code> + any single word for definitions and translations.
+
+🔍 <b>Ask Questions</b> — Use <code>/ask</code> followed by your question:
+<code>/ask explain the word "serendipity"</code>
+
+💬 <b>Follow-ups</b> — Reply to my messages to continue the conversation.
+
+All responses are concise and include Arabic translations with full diacritics.`;
+
+    await sendTelegramMessage(chatId, welcomeText, lovableKey, telegramKey, messageId);
+    return;
+  }
 
   // Store message (fire and forget for speed)
   const storePromise = supabase.from('telegram_messages').upsert({
