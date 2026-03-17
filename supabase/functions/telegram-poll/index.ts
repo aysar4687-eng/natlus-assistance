@@ -227,6 +227,10 @@ All responses are concise and include Arabic translations with full diacritics.`
       questionText = text.trim();
       parentConversationId = conv.id;
     }
+  } else if (msg.chat.type === 'private' && text.trim() && !text.startsWith('/')) {
+    // In private chat, process any plain text message automatically
+    shouldProcess = true;
+    questionText = text.trim();
   }
 
   if (!shouldProcess || !questionText) {
