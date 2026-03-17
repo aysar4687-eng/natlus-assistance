@@ -156,11 +156,38 @@ async function processUpdate(update: any, supabase: any, lovableKey: string, tel
   const msg = update.message;
   if (!msg) return;
 
-  const text = msg.text || '';
   const chatId = msg.chat.id;
+  const messageId = msg.message_id;
+
+  // Handle bot added to a new group
+  if (msg.new_chat_members && Array.isArray(msg.new_chat_members)) {
+    const botAdded = msg.new_chat_members.some((m: any) => m.is_bot && m.username);
+    if (botAdded) {
+      const welcomeText = `🤖 <b>Natlus Assistance has joined the group!</b>
+
+I'm an AI-powered language and knowledge assistant. Here's how to interact with me:
+
+📖 <b>Word Definitions</b>
+Use <code>/ask</code> + any English word to get meanings, examples, and Arabic translations with full diacritics.
+
+🔍 <b>Ask Questions</b>
+Use <code>/ask</code> followed by any question:
+<code>/ask explain the word "serendipity"</code>
+
+💬 <b>Follow-up Conversations</b>
+Reply directly to any of my messages to continue the conversation with context.
+
+⚡ All responses are concise, formatted, and include Arabic translations when relevant.
+
+Type <code>/ask</code> to get started!`;
+      await sendTelegramMessage(chatId, welcomeText, lovableKey, telegramKey);
+      return;
+    }
+  }
+
+  const text = msg.text || '';
   const userId = msg.from?.id;
   const username = msg.from?.username || msg.from?.first_name || 'Unknown';
-  const messageId = msg.message_id;
   const replyToMessageId = msg.reply_to_message?.message_id;
   const isAskCommand = text.startsWith('/ask');
   const isStartCommand = text.startsWith('/start');
