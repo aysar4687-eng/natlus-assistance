@@ -44,7 +44,7 @@ serve(async (req) => {
     const remainingMs = MAX_RUNTIME_MS - elapsed;
     if (remainingMs < MIN_REMAINING_MS) break;
 
-    const timeout = Math.min(15, Math.floor(remainingMs / 1000) - 3);
+    const timeout = Math.min(8, Math.floor(remainingMs / 1000) - 2);
     if (timeout < 1) break;
 
     try {
