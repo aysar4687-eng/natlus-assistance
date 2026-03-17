@@ -2,10 +2,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 
 const GATEWAY_URL = 'https://connector-gateway.lovable.dev/telegram';
-const MAX_RUNTIME_MS = 58_000; // Push closer to 60s limit
-const MIN_REMAINING_MS = 2_000; // Minimal buffer
-const POLLER_LEASE_STALE_MS = 9_000;
-const POLLER_HEARTBEAT_MS = 3_000;
+const MAX_RUNTIME_MS = 55_000;
+const MIN_REMAINING_MS = 3_000;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -39,35 +37,17 @@ serve(async (req) => {
     return new Response(JSON.stringify({ error: stateErr.message }), { status: 500, headers: corsHeaders });
   }
 
-  const leaseAcquired = await acquirePollerLease(supabase);
-  if (!leaseAcquired) {
-    return new Response(JSON.stringify({ ok: true, skipped: 'another poller instance is active' }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
-
   let currentOffset = state.update_offset;
-  let lastHeartbeat = 0;
 
   while (true) {
     const elapsed = Date.now() - startTime;
     const remainingMs = MAX_RUNTIME_MS - elapsed;
     if (remainingMs < MIN_REMAINING_MS) break;
 
-    // Short poll timeout for fast response — 2 seconds max
-    // This means we check for new messages every ~2s instead of long-polling
-    const timeout = Math.min(2, Math.floor(remainingMs / 1000) - 1);
+    const timeout = Math.min(25, Math.floor(remainingMs / 1000) - 3);
     if (timeout < 1) break;
 
     try {
-      const now = Date.now();
-      if (now - lastHeartbeat >= POLLER_HEARTBEAT_MS) {
-        await supabase
-          .from('telegram_bot_state')
-          .update({ updated_at: new Date(now).toISOString() })
-          .eq('id', 1);
-        lastHeartbeat = now;
-      }
 
       const response = await fetch(`${GATEWAY_URL}/getUpdates`, {
         method: 'POST',
@@ -112,7 +92,6 @@ serve(async (req) => {
         .update({ update_offset: newOffset, updated_at: offsetUpdateTime })
         .eq('id', 1);
       currentOffset = newOffset;
-      lastHeartbeat = Date.now();
 
     } catch (err) {
       console.error('Poll loop error:', err);
@@ -126,31 +105,8 @@ serve(async (req) => {
   });
 });
 
-async function acquirePollerLease(supabase: any): Promise<boolean> {
-  try {
-    const now = Date.now();
-    const nowIso = new Date(now).toISOString();
-    const staleBeforeIso = new Date(now - POLLER_LEASE_STALE_MS).toISOString();
 
-    const { data, error } = await supabase
-      .from('telegram_bot_state')
-      .update({ updated_at: nowIso })
-      .eq('id', 1)
-      .lt('updated_at', staleBeforeIso)
-      .select('id')
-      .maybeSingle();
 
-    if (error) {
-      console.error('Poller lease acquire error:', error);
-      return false;
-    }
-
-    return !!data;
-  } catch (error) {
-    console.error('Poller lease acquire exception:', error);
-    return false;
-  }
-}
 
 async function processUpdate(update: any, supabase: any, lovableKey: string, telegramKey: string) {
   const msg = update.message;
