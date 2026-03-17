@@ -2,10 +2,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 
 const GATEWAY_URL = 'https://connector-gateway.lovable.dev/telegram';
-const MAX_RUNTIME_MS = 58_000; // Push closer to 60s limit
-const MIN_REMAINING_MS = 2_000; // Minimal buffer
-const POLLER_LEASE_STALE_MS = 9_000;
-const POLLER_HEARTBEAT_MS = 3_000;
+const MAX_RUNTIME_MS = 55_000;
+const MIN_REMAINING_MS = 3_000;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
