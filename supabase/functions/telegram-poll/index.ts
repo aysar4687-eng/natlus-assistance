@@ -147,6 +147,7 @@ Type <code>/ask</code> to get started!`;
   const replyToMessageId = msg.reply_to_message?.message_id;
   const isAskCommand = text.startsWith('/ask');
   const isStartCommand = text.startsWith('/start');
+  const isHelpCommand = text.startsWith('/help');
 
   // Store message (fire and forget for speed)
   const storePromise = supabase.from('telegram_messages').upsert({
@@ -157,10 +158,49 @@ Type <code>/ask</code> to get started!`;
     username,
     text,
     reply_to_message_id: replyToMessageId,
-    is_bot_command: isAskCommand || isStartCommand,
+    is_bot_command: isAskCommand || isStartCommand || isHelpCommand,
     raw_update: update,
     processed: false,
   }, { onConflict: 'update_id' });
+
+  // Handle /help command
+  if (isHelpCommand) {
+    await storePromise;
+    const isPrivateChat = msg.chat.type === 'private';
+    const helpText = `📚 <b>Natlus Assistance — Command Reference</b>
+
+━━━━━━━━━━━━━━━━━━━━━
+
+🔹 <code>/ask</code> <i>&lt;word or question&gt;</i>
+Get definitions, meanings, Arabic translations with full diacritics, and example sentences.
+<b>Examples:</b>
+  • <code>/ask eloquent</code> — Word definition
+  • <code>/ask What is the past tense of "go"?</code> — Grammar question
+  • <code>/ask Explain idiom "break the ice"</code> — Idiom explanation
+
+🔹 <code>/start</code>
+Display the welcome message and bot introduction.
+
+🔹 <code>/help</code>
+Show this command reference guide.
+
+━━━━━━━━━━━━━━━━━━━━━
+
+💡 <b>Tips & Features:</b>
+
+${isPrivateChat ? `• <b>Direct Messages:</b> Just type any English word directly — no command needed! I'll instantly provide its definition and Arabic translation.
+• <b>Questions:</b> Use <code>/ask</code> for full questions, or just send a single word for quick lookup.` : `• <b>In Groups:</b> Always use <code>/ask</code> before your word or question so I know it's for me.`}
+• <b>Follow-ups:</b> Reply directly to any of my messages to continue the conversation with full context.
+• <b>Multi-meaning Words:</b> I provide all relevant meanings with part of speech, Arabic translation, and usage examples.
+• <b>Concise Responses:</b> All answers are brief, formatted, and optimized for quick reading.
+
+━━━━━━━━━━━━━━━━━━━━━
+
+⚡ <i>Powered by AI — Fast, accurate, and always ready.</i>`;
+
+    await sendTelegramMessage(chatId, helpText, lovableKey, telegramKey, messageId);
+    return;
+  }
 
   // Handle /start command — send welcome message
   if (isStartCommand) {
@@ -183,6 +223,7 @@ Reply directly to any of my messages to continue the conversation with context.
 
 ⚡ Responses are concise, formatted, and include Arabic translations with full diacritics when relevant.
 
+Type <code>/help</code> for full command reference.
 Start by sending a word or use <code>/ask</code> to begin!`
       : `🤖 <b>Natlus Assistance is active!</b>
 
@@ -195,6 +236,7 @@ Here's how to use me in this group:
 
 💬 <b>Follow-ups</b> — Reply to my messages to continue the conversation.
 
+Type <code>/help</code> for full command reference.
 All responses are concise and include Arabic translations with full diacritics.`;
 
     await sendTelegramMessage(chatId, welcomeText, lovableKey, telegramKey, messageId);
