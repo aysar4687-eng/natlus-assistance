@@ -105,31 +105,8 @@ serve(async (req) => {
   });
 });
 
-async function acquirePollerLease(supabase: any): Promise<boolean> {
-  try {
-    const now = Date.now();
-    const nowIso = new Date(now).toISOString();
-    const staleBeforeIso = new Date(now - POLLER_LEASE_STALE_MS).toISOString();
 
-    const { data, error } = await supabase
-      .from('telegram_bot_state')
-      .update({ updated_at: nowIso })
-      .eq('id', 1)
-      .lt('updated_at', staleBeforeIso)
-      .select('id')
-      .maybeSingle();
 
-    if (error) {
-      console.error('Poller lease acquire error:', error);
-      return false;
-    }
-
-    return !!data;
-  } catch (error) {
-    console.error('Poller lease acquire exception:', error);
-    return false;
-  }
-}
 
 async function processUpdate(update: any, supabase: any, lovableKey: string, telegramKey: string) {
   const msg = update.message;
