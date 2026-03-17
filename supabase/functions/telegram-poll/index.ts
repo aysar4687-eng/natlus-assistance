@@ -37,15 +37,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({ error: stateErr.message }), { status: 500, headers: corsHeaders });
   }
 
-  const leaseAcquired = await acquirePollerLease(supabase);
-  if (!leaseAcquired) {
-    return new Response(JSON.stringify({ ok: true, skipped: 'another poller instance is active' }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
-
   let currentOffset = state.update_offset;
-  let lastHeartbeat = 0;
 
   while (true) {
     const elapsed = Date.now() - startTime;
