@@ -44,20 +44,10 @@ serve(async (req) => {
     const remainingMs = MAX_RUNTIME_MS - elapsed;
     if (remainingMs < MIN_REMAINING_MS) break;
 
-    // Short poll timeout for fast response — 2 seconds max
-    // This means we check for new messages every ~2s instead of long-polling
-    const timeout = Math.min(2, Math.floor(remainingMs / 1000) - 1);
+    const timeout = Math.min(25, Math.floor(remainingMs / 1000) - 3);
     if (timeout < 1) break;
 
     try {
-      const now = Date.now();
-      if (now - lastHeartbeat >= POLLER_HEARTBEAT_MS) {
-        await supabase
-          .from('telegram_bot_state')
-          .update({ updated_at: new Date(now).toISOString() })
-          .eq('id', 1);
-        lastHeartbeat = now;
-      }
 
       const response = await fetch(`${GATEWAY_URL}/getUpdates`, {
         method: 'POST',
