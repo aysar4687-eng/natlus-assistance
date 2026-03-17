@@ -92,7 +92,6 @@ serve(async (req) => {
         .update({ update_offset: newOffset, updated_at: offsetUpdateTime })
         .eq('id', 1);
       currentOffset = newOffset;
-      lastHeartbeat = Date.now();
 
     } catch (err) {
       console.error('Poll loop error:', err);
