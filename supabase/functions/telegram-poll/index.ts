@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 
 const GATEWAY_URL = 'https://connector-gateway.lovable.dev/telegram';
-const MAX_RUNTIME_MS = 55_000;
+const MAX_RUNTIME_MS = 25_000;  // 25s — fits within 30s staggered cron window
 const MIN_REMAINING_MS = 3_000;
 
 const corsHeaders = {
