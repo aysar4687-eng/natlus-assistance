@@ -147,6 +147,7 @@ Type <code>/ask</code> to get started!`;
   const replyToMessageId = msg.reply_to_message?.message_id;
   const isAskCommand = text.startsWith('/ask');
   const isStartCommand = text.startsWith('/start');
+  const isHelpCommand = text.startsWith('/help');
 
   // Store message (fire and forget for speed)
   const storePromise = supabase.from('telegram_messages').upsert({
