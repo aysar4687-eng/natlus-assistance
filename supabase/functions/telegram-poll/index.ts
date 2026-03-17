@@ -230,13 +230,14 @@ All responses are concise and include Arabic translations with full diacritics.`
       await sendTelegramMessage(chatId, 'Usage: /ask <your question>', lovableKey, telegramKey, messageId);
       return;
     }
-  } else if (replyToMessageId) {
+  } else if (replyToMessageId && msg.reply_to_message?.from?.is_bot) {
+    // Only process replies that are directed at THIS bot's messages
     const { data: conv } = await supabase
       .from('telegram_conversations')
       .select('id')
       .eq('chat_id', chatId)
       .eq('bot_message_id', replyToMessageId)
-      .single();
+      .maybeSingle();
 
     if (conv) {
       shouldProcess = true;
