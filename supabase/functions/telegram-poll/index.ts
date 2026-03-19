@@ -126,6 +126,9 @@ I'm an AI-powered language and knowledge assistant. Here's how to interact with 
 📖 <b>Word Definitions</b>
 Use <code>/ask</code> + any English word to get meanings, examples, and Arabic translations with full diacritics.
 
+🔄 <b>Reply Shortcut</b>
+Reply to any message with <code>/ask</code> to ask the bot about that text — no need to retype!
+
 🔍 <b>Ask Questions</b>
 Use <code>/ask</code> followed by any question:
 <code>/ask explain the word "serendipity"</code>
