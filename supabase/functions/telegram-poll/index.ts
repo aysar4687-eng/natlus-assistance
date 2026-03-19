@@ -178,6 +178,10 @@ Get definitions, meanings, Arabic translations with full diacritics, and example
   • <code>/ask What is the past tense of "go"?</code> — Grammar question
   • <code>/ask Explain idiom "break the ice"</code> — Idiom explanation
 
+🔹 <b>Reply with</b> <code>/ask</code>
+Reply to any message in the group with <code>/ask</code> to ask the bot about that text — no need to retype it!
+<b>Example:</b> Someone writes "serendipity" → Reply to their message with <code>/ask</code> → Get the full definition.
+
 🔹 <code>/start</code>
 Display the welcome message and bot introduction.
 
@@ -189,7 +193,8 @@ Show this command reference guide.
 💡 <b>Tips & Features:</b>
 
 ${isPrivateChat ? `• <b>Direct Messages:</b> Just type any English word directly — no command needed! I'll instantly provide its definition and Arabic translation.
-• <b>Questions:</b> Use <code>/ask</code> for full questions, or just send a single word for quick lookup.` : `• <b>In Groups:</b> Always use <code>/ask</code> before your word or question so I know it's for me.`}
+• <b>Questions:</b> Use <code>/ask</code> for full questions, or just send a single word for quick lookup.` : `• <b>In Groups:</b> Always use <code>/ask</code> before your word or question so I know it's for me.
+• <b>Reply Shortcut:</b> See an interesting word or question? Just reply to it with <code>/ask</code> — I'll handle the rest!`}
 • <b>Follow-ups:</b> Reply directly to any of my messages to continue the conversation with full context.
 • <b>Multi-meaning Words:</b> I provide all relevant meanings with part of speech, Arabic translation, and usage examples.
 • <b>Concise Responses:</b> All answers are brief, formatted, and optimized for quick reading.
