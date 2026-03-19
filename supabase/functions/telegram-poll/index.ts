@@ -249,10 +249,14 @@ All responses are concise and include Arabic translations with full diacritics.`
 
   if (isAskCommand) {
     shouldProcess = true;
-    questionText = text.replace(/^\/ask\s*/, '').trim();
+    questionText = text.replace(/^\/ask(@\w+)?\s*/, '').trim();
+    // If /ask is used as a reply to another message and no text provided, use the replied message's text
+    if (!questionText && replyToMessageId && msg.reply_to_message?.text) {
+      questionText = msg.reply_to_message.text.trim();
+    }
     if (!questionText) {
       await storePromise;
-      await sendTelegramMessage(chatId, 'Usage: /ask <your question>', lovableKey, telegramKey, messageId);
+      await sendTelegramMessage(chatId, '📌 <b>Usage:</b>\n• <code>/ask &lt;word or question&gt;</code>\n• Reply to any message with <code>/ask</code> to ask about it', lovableKey, telegramKey, messageId);
       return;
     }
   } else if (replyToMessageId && msg.reply_to_message?.from?.is_bot) {
