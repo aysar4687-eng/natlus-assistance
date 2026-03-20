@@ -59,7 +59,7 @@ serve(async (req) => {
         body: JSON.stringify({
           offset: currentOffset,
           timeout,
-          allowed_updates: ['message'],
+          allowed_updates: ['message', 'callback_query'],
         }),
       });
 
@@ -109,6 +109,12 @@ serve(async (req) => {
 
 
 async function processUpdate(update: any, supabase: any, lovableKey: string, telegramKey: string) {
+  // Handle callback queries (inline button presses)
+  if (update.callback_query) {
+    await handleCallbackQuery(update.callback_query, supabase, lovableKey, telegramKey);
+    return;
+  }
+
   const msg = update.message;
   if (!msg) return;
 
@@ -200,6 +206,7 @@ ${isPrivateChat ? `• <b>Direct Messages:</b> Just type any English word direct
 • <b>Reply Shortcut:</b> See an interesting word or question? Just reply to it with <code>/ask</code> — I'll handle the rest!`}
 • <b>Follow-ups:</b> Reply directly to any of my messages to continue the conversation with full context.
 • <b>Multi-meaning Words:</b> I provide all relevant meanings with part of speech, Arabic translation, and usage examples.
+• <b>Etymology Button:</b> After word definitions, tap the <b>📜 Etymology</b> button to discover the word's origin and history.
 • <b>Concise Responses:</b> All answers are brief, formatted, and optimized for quick reading.
 
 ━━━━━━━━━━━━━━━━━━━━━
@@ -316,7 +323,12 @@ All responses are concise and include Arabic translations with full diacritics.`
 
     clearInterval(typingInterval);
 
-    const sentMessage = await sendTelegramMessage(chatId, finalResponse, lovableKey, telegramKey, messageId);
+    // Add Etymology inline button for dictionary queries
+    const inlineKeyboard = isDictionaryQuery ? {
+      inline_keyboard: [[{ text: '📜 Etymology', callback_data: `etymology:${questionText.trim().toLowerCase()}` }]]
+    } : undefined;
+
+    const sentMessage = await sendTelegramMessage(chatId, finalResponse, lovableKey, telegramKey, messageId, inlineKeyboard);
 
     // Store conversation + mark processed + log concurrently
     const afterPromises = [
@@ -350,6 +362,69 @@ All responses are concise and include Arabic translations with full diacritics.`
   }
 }
 
+async function handleCallbackQuery(callbackQuery: any, supabase: any, lovableKey: string, telegramKey: string) {
+  const data = callbackQuery.data || '';
+  const chatId = callbackQuery.message?.chat?.id;
+  const messageId = callbackQuery.message?.message_id;
+  const callbackQueryId = callbackQuery.id;
+
+  // Answer the callback to remove loading state
+  fetch(`${GATEWAY_URL}/answerCallbackQuery`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${lovableKey}`,
+      'X-Connection-Api-Key': telegramKey,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ callback_query_id: callbackQueryId }),
+  }).catch(() => {});
+
+  if (!data.startsWith('etymology:') || !chatId) return;
+
+  const word = data.replace('etymology:', '').trim();
+  if (!word) return;
+
+  // Send typing indicator
+  sendChatAction(chatId, 'typing', lovableKey, telegramKey);
+
+  // Call AI for etymology
+  const etymologyPrompt = `Provide the etymology (origin) of the English word "${word}". Format your response EXACTLY like this:
+
+<b><u>${word}</u></b>
+[Etymology explanation: language of origin, root words, how it evolved into modern English. Include original language terms in italics. Keep it concise but informative, max 600 characters.]
+
+Use HTML formatting. Write the etymology in English. Be precise and scholarly.`;
+
+  try {
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${lovableKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash-lite',
+        messages: [
+          { role: 'system', content: 'You are an expert etymologist. Provide word origins concisely using HTML formatting for Telegram. No emojis, no filler. Direct scholarly response only.' },
+          { role: 'user', content: etymologyPrompt },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('Etymology AI error:', response.status);
+      return;
+    }
+
+    const aiData = await response.json();
+    const etymologyText = aiData.choices?.[0]?.message?.content || 'Etymology not available.';
+
+    await sendTelegramMessage(chatId, etymologyText, lovableKey, telegramKey, messageId);
+  } catch (e) {
+    console.error('Etymology error:', e);
+  }
+}
+
 async function sendChatAction(chatId: number, action: string, lovableKey: string, telegramKey: string) {
   try {
     const res = await fetch(`${GATEWAY_URL}/sendChatAction`, {
@@ -361,7 +436,7 @@ async function sendChatAction(chatId: number, action: string, lovableKey: string
       },
       body: JSON.stringify({ chat_id: chatId, action }),
     });
-    await res.text(); // Must consume body in Deno to prevent resource leak
+    await res.text();
   } catch (e) { /* silent */ }
 }
 
@@ -373,7 +448,7 @@ function isHtmlFormatted(text: string): boolean {
   return /<\/?[a-z][\s\S]*>/i.test(text);
 }
 
-async function sendTelegramMessage(chatId: number, text: string, lovableKey: string, telegramKey: string, replyToMessageId?: number) {
+async function sendTelegramMessage(chatId: number, text: string, lovableKey: string, telegramKey: string, replyToMessageId?: number, reply_markup?: any) {
   try {
     const useHtml = isHtmlFormatted(text);
     const formattedText = useHtml ? text : convertToTelegramMarkdown(text);
@@ -381,9 +456,12 @@ async function sendTelegramMessage(chatId: number, text: string, lovableKey: str
     const chunks = splitMessage(formattedText, 4000);
     let lastSent = null;
 
-    for (const chunk of chunks) {
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
       const body: any = { chat_id: chatId, text: chunk, parse_mode: parseMode };
       if (replyToMessageId && !lastSent) body.reply_to_message_id = replyToMessageId;
+      // Add inline keyboard only to the last chunk
+      if (reply_markup && i === chunks.length - 1) body.reply_markup = reply_markup;
 
       const response = await fetch(`${GATEWAY_URL}/sendMessage`, {
         method: 'POST',
