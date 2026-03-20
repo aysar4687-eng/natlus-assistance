@@ -206,6 +206,7 @@ ${isPrivateChat ? `• <b>Direct Messages:</b> Just type any English word direct
 • <b>Reply Shortcut:</b> See an interesting word or question? Just reply to it with <code>/ask</code> — I'll handle the rest!`}
 • <b>Follow-ups:</b> Reply directly to any of my messages to continue the conversation with full context.
 • <b>Multi-meaning Words:</b> I provide all relevant meanings with part of speech, Arabic translation, and usage examples.
+• <b>Etymology Button:</b> After word definitions, tap the <b>📜 Etymology</b> button to discover the word's origin and history.
 • <b>Concise Responses:</b> All answers are brief, formatted, and optimized for quick reading.
 
 ━━━━━━━━━━━━━━━━━━━━━
