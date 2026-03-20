@@ -322,7 +322,12 @@ All responses are concise and include Arabic translations with full diacritics.`
 
     clearInterval(typingInterval);
 
-    const sentMessage = await sendTelegramMessage(chatId, finalResponse, lovableKey, telegramKey, messageId);
+    // Add Etymology inline button for dictionary queries
+    const inlineKeyboard = isDictionaryQuery ? {
+      inline_keyboard: [[{ text: '📜 Etymology', callback_data: `etymology:${questionText.trim().toLowerCase()}` }]]
+    } : undefined;
+
+    const sentMessage = await sendTelegramMessage(chatId, finalResponse, lovableKey, telegramKey, messageId, inlineKeyboard);
 
     // Store conversation + mark processed + log concurrently
     const afterPromises = [
