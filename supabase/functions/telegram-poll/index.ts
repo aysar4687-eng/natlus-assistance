@@ -384,9 +384,9 @@ async function handleCallbackQuery(callbackQuery: any, supabase: any, lovableKey
     body: JSON.stringify({ callback_query_id: callbackQueryId }),
   }).catch(() => {});
 
-  if (!data.startsWith('etymology:') || !chatId) return;
+  if (!data.startsWith('ety:') || !chatId) return;
 
-  const word = data.replace('etymology:', '').trim();
+  const word = data.replace('ety:', '').trim();
   if (!word) return;
 
   // Send typing indicator
