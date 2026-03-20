@@ -323,11 +323,16 @@ All responses are concise and include Arabic translations with full diacritics.`
 
     clearInterval(typingInterval);
 
-    // Add Etymology inline button for dictionary queries
-    const inlineKeyboard = isDictionaryQuery ? {
-      inline_keyboard: [[{ text: '📜 Etymology', callback_data: `etymology:${questionText.trim().toLowerCase()}` }]]
+    // Add Etymology inline button for dictionary queries (single English word)
+    const trimmedQuestion = questionText.trim();
+    const isDictQuery = /^[A-Za-z][A-Za-z-]*$/.test(trimmedQuestion);
+    console.log(`Dictionary check: "${trimmedQuestion}" isDictQuery=${isDictQuery} isDictionaryQuery=${isDictionaryQuery}`);
+    
+    const inlineKeyboard = isDictQuery ? {
+      inline_keyboard: [[{ text: '📜 Etymology', callback_data: `ety:${trimmedQuestion.toLowerCase().slice(0, 58)}` }]]
     } : undefined;
 
+    console.log('Sending with reply_markup:', JSON.stringify(inlineKeyboard));
     const sentMessage = await sendTelegramMessage(chatId, finalResponse, lovableKey, telegramKey, messageId, inlineKeyboard);
 
     // Store conversation + mark processed + log concurrently
