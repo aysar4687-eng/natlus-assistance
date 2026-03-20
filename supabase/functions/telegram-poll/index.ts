@@ -59,7 +59,7 @@ serve(async (req) => {
         body: JSON.stringify({
           offset: currentOffset,
           timeout,
-          allowed_updates: ['message'],
+          allowed_updates: ['message', 'callback_query'],
         }),
       });
 
