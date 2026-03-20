@@ -425,7 +425,7 @@ Use HTML formatting. Write the etymology in English. Be precise and scholarly.`;
   }
 }
 
-
+async function sendChatAction(chatId: number, action: string, lovableKey: string, telegramKey: string) {
   try {
     const res = await fetch(`${GATEWAY_URL}/sendChatAction`, {
       method: 'POST',
@@ -436,7 +436,7 @@ Use HTML formatting. Write the etymology in English. Be precise and scholarly.`;
       },
       body: JSON.stringify({ chat_id: chatId, action }),
     });
-    await res.text(); // Must consume body in Deno to prevent resource leak
+    await res.text();
   } catch (e) { /* silent */ }
 }
 
