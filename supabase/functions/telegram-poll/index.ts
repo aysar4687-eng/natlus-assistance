@@ -384,7 +384,7 @@ function isHtmlFormatted(text: string): boolean {
   return /<\/?[a-z][\s\S]*>/i.test(text);
 }
 
-async function sendTelegramMessage(chatId: number, text: string, lovableKey: string, telegramKey: string, replyToMessageId?: number) {
+async function sendTelegramMessage(chatId: number, text: string, lovableKey: string, telegramKey: string, replyToMessageId?: number, reply_markup?: any) {
   try {
     const useHtml = isHtmlFormatted(text);
     const formattedText = useHtml ? text : convertToTelegramMarkdown(text);
@@ -392,9 +392,12 @@ async function sendTelegramMessage(chatId: number, text: string, lovableKey: str
     const chunks = splitMessage(formattedText, 4000);
     let lastSent = null;
 
-    for (const chunk of chunks) {
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
       const body: any = { chat_id: chatId, text: chunk, parse_mode: parseMode };
       if (replyToMessageId && !lastSent) body.reply_to_message_id = replyToMessageId;
+      // Add inline keyboard only to the last chunk
+      if (reply_markup && i === chunks.length - 1) body.reply_markup = reply_markup;
 
       const response = await fetch(`${GATEWAY_URL}/sendMessage`, {
         method: 'POST',
