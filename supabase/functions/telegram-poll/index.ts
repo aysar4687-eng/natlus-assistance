@@ -109,6 +109,12 @@ serve(async (req) => {
 
 
 async function processUpdate(update: any, supabase: any, lovableKey: string, telegramKey: string) {
+  // Handle callback queries (inline button presses)
+  if (update.callback_query) {
+    await handleCallbackQuery(update.callback_query, supabase, lovableKey, telegramKey);
+    return;
+  }
+
   const msg = update.message;
   if (!msg) return;
 
