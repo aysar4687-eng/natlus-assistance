@@ -120,7 +120,18 @@ async function processUpdate(update: any, supabase: any, lovableKey: string, tel
 
   // Handle bot added to a new group
   if (msg.new_chat_members && Array.isArray(msg.new_chat_members)) {
-    const botAdded = msg.new_chat_members.some((m: any) => m.is_bot && m.username);
+    // Get bot info to check if THIS bot was added
+    const botInfoRes = await fetch(`${GATEWAY_URL}/getMe`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${lovableKey}`,
+        'X-Connection-Api-Key': telegramKey,
+        'Content-Type': 'application/json',
+      },
+    });
+    const botInfo = await botInfoRes.json();
+    const botId = botInfo?.result?.id;
+    const botAdded = botId && msg.new_chat_members.some((m: any) => m.id === botId);
     if (botAdded) {
       const welcomeText = `🤖 <b>Natlus Assistance has joined the group!</b>
 
