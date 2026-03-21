@@ -389,7 +389,7 @@ function isHtmlFormatted(text: string): boolean {
   return /<\/?[a-z][\s\S]*>/i.test(text);
 }
 
-async function sendTelegramMessage(chatId: number, text: string, lovableKey: string, telegramKey: string, replyToMessageId?: number, reply_markup?: any) {
+async function sendTelegramMessage(chatId: number, text: string, lovableKey: string, telegramKey: string, replyToMessageId?: number) {
   try {
     const useHtml = isHtmlFormatted(text);
     const formattedText = useHtml ? text : convertToTelegramMarkdown(text);
