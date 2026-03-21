@@ -112,9 +112,6 @@ async function processUpdate(update: any, supabase: any, lovableKey: string, tel
   const msg = update.message;
   if (!msg) return;
 
-  const msg = update.message;
-  if (!msg) return;
-
   const chatId = msg.chat.id;
   const messageId = msg.message_id;
 
