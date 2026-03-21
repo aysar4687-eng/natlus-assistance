@@ -365,68 +365,6 @@ All responses are concise and include Arabic translations with full diacritics.`
   }
 }
 
-async function handleCallbackQuery(callbackQuery: any, supabase: any, lovableKey: string, telegramKey: string) {
-  const data = callbackQuery.data || '';
-  const chatId = callbackQuery.message?.chat?.id;
-  const messageId = callbackQuery.message?.message_id;
-  const callbackQueryId = callbackQuery.id;
-
-  // Answer the callback to remove loading state
-  fetch(`${GATEWAY_URL}/answerCallbackQuery`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${lovableKey}`,
-      'X-Connection-Api-Key': telegramKey,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ callback_query_id: callbackQueryId }),
-  }).catch(() => {});
-
-  if (!data.startsWith('ety:') || !chatId) return;
-
-  const word = data.replace('ety:', '').trim();
-  if (!word) return;
-
-  // Send typing indicator
-  sendChatAction(chatId, 'typing', lovableKey, telegramKey);
-
-  // Call AI for etymology
-  const etymologyPrompt = `Provide the etymology (origin) of the English word "${word}". Format your response EXACTLY like this:
-
-<b><u>${word}</u></b>
-[Etymology explanation: language of origin, root words, how it evolved into modern English. Include original language terms in italics. Keep it concise but informative, max 600 characters.]
-
-Use HTML formatting. Write the etymology in English. Be precise and scholarly.`;
-
-  try {
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${lovableKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash-lite',
-        messages: [
-          { role: 'system', content: 'You are an expert etymologist. Provide word origins concisely using HTML formatting for Telegram. No emojis, no filler. Direct scholarly response only.' },
-          { role: 'user', content: etymologyPrompt },
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      console.error('Etymology AI error:', response.status);
-      return;
-    }
-
-    const aiData = await response.json();
-    const etymologyText = aiData.choices?.[0]?.message?.content || 'Etymology not available.';
-
-    await sendTelegramMessage(chatId, etymologyText, lovableKey, telegramKey, messageId);
-  } catch (e) {
-    console.error('Etymology error:', e);
-  }
-}
 
 async function sendChatAction(chatId: number, action: string, lovableKey: string, telegramKey: string) {
   try {
