@@ -321,7 +321,9 @@ All responses are concise and include Arabic translations with full diacritics.`
 
   try {
     const aiResponse = await callAI(questionText, history, lovableKey);
-    const isDictionaryQuery = /^[A-Za-z][A-Za-z-]*$/.test(questionText.trim());
+    // Match single words OR phrasal verbs (2-4 words, e.g. "hear me out", "break the ice")
+    const trimmedQ = questionText.trim();
+    const isDictionaryQuery = /^[A-Za-z][A-Za-z-]*(\s+[A-Za-z][A-Za-z-]*){0,3}$/.test(trimmedQ) && trimmedQ.split(/\s+/).length <= 4;
     const finalResponse = isDictionaryQuery
       ? normalizeDictionaryResponse(aiResponse, questionText.trim())
       : aiResponse;
