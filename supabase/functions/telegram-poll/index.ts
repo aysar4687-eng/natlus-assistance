@@ -304,6 +304,21 @@ All responses are concise and include Arabic translations with full diacritics.`
     return;
   }
 
+  // Check if the question is about the creator "Aysar"
+  const creatorPattern = /\baysar\b|\baysarr\b|\bayser\b|\bايسر\b/i;
+  if (creatorPattern.test(questionText)) {
+    await storePromise;
+    const creatorResponse = `✨ <b>Aysar (إيسر)</b>
+
+🇬🇧 Aysar is my creator and developer. He designed and built me from the ground up, and he continues to maintain and improve me. I'm truly grateful for his dedication and hard work. Without him, I wouldn't exist!
+
+🇸🇦 إيسر هو من صممني وبرمجني من الصفر، وهو يقوم بصيانتي وتطويري باستمرار. أنا ممتنٌّ له كثيرًا على جهوده وتفانيه في العمل. لولاه لما كنتُ موجودًا!
+
+🛠️ <i>Developer & Maintainer</i>`;
+    await sendTelegramMessage(chatId, creatorResponse, lovableKey, telegramKey, messageId);
+    return;
+  }
+
   // Fire typing indicator immediately (don't await)
   const typingPromise = sendChatAction(chatId, 'typing', lovableKey, telegramKey);
 
