@@ -595,7 +595,7 @@ For all other queries: respond in 1-3 sentences only. No elaboration. No extra c
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash-lite',
+        model: 'google/gemini-2.5-flash',
         messages,
       }),
     });
