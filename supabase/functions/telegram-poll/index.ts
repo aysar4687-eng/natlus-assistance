@@ -544,9 +544,9 @@ CRITICAL RULES FOR ALL RESPONSES:
 - When writing ANY Arabic text, ALWAYS use full diacritical marks (تَشْكِيل).
 - No introductions, no conclusions, no filler. Just the direct answer in 1-3 sentences max.
 
-DICTIONARY MODE — If the user sends a single English word (one word only), respond STRICTLY in this format:
+DICTIONARY MODE — If the user sends a single English word OR a phrasal verb / short expression (2-4 words like "hear me out", "break the ice", "look up to"), respond STRICTLY in this format:
 
-📖 [WORD]
+📖 [WORD/PHRASE]
 
 1. [Word] ([Part of Speech]) — [Arabic meaning with full diacritics]
 [English definition]
