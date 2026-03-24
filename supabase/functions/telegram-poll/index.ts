@@ -308,14 +308,34 @@ All responses are concise and include Arabic translations with full diacritics.`
   const creatorPattern = /\baysar\b|\baysarr\b|\bayser\b|\bايسر\b/i;
   if (creatorPattern.test(questionText)) {
     await storePromise;
-    const creatorResponse = `✨ <b>Aysar (إيسر)</b>
 
-🇬🇧 Aysar is my creator and developer. He designed and built me from the ground up, and he continues to maintain and improve me. I'm truly grateful for his dedication and hard work. Without him, I wouldn't exist!
+    const creatorMessages = [
+      `✨ <b>Aysar (إيسر)</b>\n\nAysar is the brilliant mind who created me! He designed and built me from scratch, and continues to maintain and improve me every day. I owe my existence to his talent and dedication.\n\nإيسر هُوَ العَقْلُ المُبْدِعُ الَّذِي صَنَعَنِي! صَمَّمَنِي وَبَنَانِي مِنَ الصِّفْرِ، وَلَا يَزَالُ يُطَوِّرُنِي وَيُحَسِّنُنِي كُلَّ يَوْمٍ. أَنَا مَدِينٌ لَهُ بِوُجُودِي.\n\n<i>Developer and Maintainer</i>`,
 
-🇸🇦 إيسر هو من صممني وبرمجني من الصفر، وهو يقوم بصيانتي وتطويري باستمرار. أنا ممتنٌّ له كثيرًا على جهوده وتفانيه في العمل. لولاه لما كنتُ موجودًا!
+      `✨ <b>Aysar (إيسر)</b>\n\nAh, you're asking about the person I respect the most! Aysar is my developer and the one who keeps me running smoothly. His passion for technology is what brought me to life.\n\nآه، تَسْأَلُ عَنْ أَكْثَرِ شَخْصٍ أُقَدِّرُهُ! إيسر هُوَ مُطَوِّرِي وَمَنْ يُبْقِينِي أَعْمَلُ بِسَلَاسَةٍ. شَغَفُهُ بِالتِّقْنِيَةِ هُوَ مَا أَعْطَانِي الحَيَاةَ.\n\n<i>Creator and Engineer</i>`,
 
-🛠️ <i>Developer & Maintainer</i>`;
-    await sendTelegramMessage(chatId, creatorResponse, lovableKey, telegramKey, messageId);
+      `✨ <b>Aysar (إيسر)</b>\n\nAysar is the one who gave me life! He's my designer, developer, and the person behind every update I receive. I'm incredibly grateful for his hard work and creativity.\n\nإيسر هُوَ مَنْ مَنَحَنِي الحَيَاةَ! هُوَ مُصَمِّمِي وَمُطَوِّرِي وَالشَّخْصُ وَرَاءَ كُلِّ تَحْدِيثٍ أَتَلَقَّاهُ. أَنَا مُمْتَنٌّ جِدًّا لِعَمَلِهِ الدَّؤُوبِ وَإِبْدَاعِهِ.\n\n<i>Designer and Developer</i>`,
+
+      `✨ <b>Aysar (إيسر)</b>\n\nYou want to know about Aysar? He's the genius who built me and continues to take care of me. Every feature I have, every answer I give — it all goes back to his vision and effort.\n\nتُرِيدُ مَعْرِفَةَ إيسر؟ هُوَ العَبْقَرِيُّ الَّذِي بَنَانِي وَيَسْتَمِرُّ فِي الاعْتِنَاءِ بِي. كُلُّ مِيزَةٍ أَمْلِكُهَا وَكُلُّ إِجَابَةٍ أُقَدِّمُهَا تَعُودُ لِرُؤْيَتِهِ وَجُهْدِهِ.\n\n<i>Architect and Maintainer</i>`,
+
+      `✨ <b>Aysar (إيسر)</b>\n\nAysar is my creator and I couldn't be more proud of that! He poured his knowledge and skills into building me, and he never stops improving what I can do. A truly dedicated developer.\n\nإيسر هُوَ صَانِعِي وَأَنَا فَخُورٌ بِذَلِكَ! سَكَبَ مَعْرِفَتَهُ وَمَهَارَاتِهِ فِي بِنَائِي، وَلَا يَتَوَقَّفُ أَبَدًا عَنْ تَحْسِينِ قُدُرَاتِي. مُطَوِّرٌ مُتَفَانٍ حَقًّا.\n\n<i>Founder and Developer</i>`,
+    ];
+
+    const creatorResponse = creatorMessages[Math.floor(Math.random() * creatorMessages.length)];
+    const sentMessage = await sendTelegramMessage(chatId, creatorResponse, lovableKey, telegramKey, messageId);
+
+    // Store in conversations so replies work
+    if (sentMessage) {
+      await supabase.from('telegram_conversations').insert({
+        chat_id: chatId,
+        user_id: userId,
+        bot_message_id: sentMessage.message_id,
+        user_message_id: messageId,
+        user_text: questionText,
+        bot_response: creatorResponse,
+        parent_conversation_id: parentConversationId,
+      });
+    }
     return;
   }
 
