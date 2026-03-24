@@ -276,7 +276,19 @@ All responses are concise and include Arabic translations with full diacritics.`
     }
     if (!questionText) {
       await storePromise;
-      await sendTelegramMessage(chatId, '📌 <b>Usage:</b>\n• <code>/ask &lt;word or question&gt;</code>\n• Reply to any message with <code>/ask</code> to ask about it', lovableKey, telegramKey, messageId);
+      const usageText = '📌 <b>Usage:</b>\n• <code>/ask &lt;word or question&gt;</code>\n• Reply to any message with <code>/ask</code> to ask about it';
+      const sentMessage = await sendTelegramMessage(chatId, usageText, lovableKey, telegramKey, messageId);
+      if (sentMessage) {
+        await supabase.from('telegram_conversations').insert({
+          chat_id: chatId,
+          user_id: userId,
+          bot_message_id: sentMessage.message_id,
+          user_message_id: messageId,
+          user_text: questionText || '/ask',
+          bot_response: usageText,
+          parent_conversation_id: parentConversationId,
+        });
+      }
       return;
     }
   } else if (replyToMessageId && msg.reply_to_message?.from?.is_bot) {
