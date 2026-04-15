@@ -683,3 +683,57 @@ For all other queries: respond in 1-3 sentences only. No elaboration. No extra c
     return 'AI service unavailable. Try again later.';
   }
 }
+
+async function callCorrectionAI(textToCorrect: string, lovableKey: string): Promise<string> {
+  const systemPrompt = `You are Natlus Assistance, a smart grammar and text correction bot.
+
+When given a text, you MUST provide EXACTLY this structured response using HTML formatting:
+
+✏️ <b>Direct Correction</b>
+[Fix ALL spelling, grammatical, and semantic errors while strictly preserving the user's original style, tone, and voice. Change only what is wrong.]
+
+📝 <b>Professional Revision</b>
+[Rewrite the text in a formal, polished style using advanced vocabulary, stronger verbs, and refined sentence structure. Elevate the quality while keeping the original meaning.]
+
+💡 <b>Learner Insights</b>
+[Briefly list the mistakes found and explain the grammar rules behind each correction. Use bullet points (•). Keep it educational and helpful. Max 3-4 key points.]
+
+RULES:
+- ALWAYS use this exact 3-section format with the exact headers above.
+- If the text has NO errors, say so in Direct Correction, but still provide a Professional Revision.
+- Keep the response concise. Max 1500 characters total.
+- If the text is in Arabic, correct Arabic grammar. If English, correct English grammar. If mixed, correct both.
+- When writing Arabic, ALWAYS use full diacritical marks (تَشْكِيل).
+- Do NOT add any introduction or conclusion outside the 3 sections.`;
+
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: `Correct the following text:\n\n"${textToCorrect}"` },
+  ];
+
+  try {
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${lovableKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages,
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error('AI gateway error (correction):', response.status, errText);
+      return 'AI processing error. Try again.';
+    }
+
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content || 'No response generated.';
+  } catch (e) {
+    console.error('AI correction call error:', e);
+    return 'AI service unavailable. Try again later.';
+  }
+}
