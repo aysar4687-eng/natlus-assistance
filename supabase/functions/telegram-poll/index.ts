@@ -140,6 +140,9 @@ Use <code>/ask</code> + any English word to get meanings, examples, and Arabic t
 🔄 <b>Reply Shortcut</b>
 Reply to any message with <code>/ask</code> to ask the bot about that text — no need to retype!
 
+✏️ <b>Grammar Correction</b>
+Reply to any message with <code>/correct</code> to get smart grammar correction with two refined versions and learning tips.
+
 🔍 <b>Ask Questions</b>
 Use <code>/ask</code> followed by any question:
 <code>/ask explain the word "serendipity"</code>
@@ -149,7 +152,7 @@ Reply directly to any of my messages to continue the conversation with context.
 
 ⚡ All responses are concise, formatted, and include Arabic translations when relevant.
 
-Type <code>/ask</code> to get started!`;
+Type <code>/ask</code> or <code>/correct</code> to get started!`;
       await sendTelegramMessage(chatId, welcomeText, lovableKey, telegramKey);
       return;
     }
@@ -160,6 +163,7 @@ Type <code>/ask</code> to get started!`;
   const username = msg.from?.username || msg.from?.first_name || 'Unknown';
   const replyToMessageId = msg.reply_to_message?.message_id;
   const isAskCommand = text.startsWith('/ask');
+  const isCorrectCommand = text.startsWith('/correct');
   const isStartCommand = text.startsWith('/start');
   const isHelpCommand = text.startsWith('/help');
 
@@ -172,7 +176,7 @@ Type <code>/ask</code> to get started!`;
     username,
     text,
     reply_to_message_id: replyToMessageId,
-    is_bot_command: isAskCommand || isStartCommand || isHelpCommand,
+    is_bot_command: isAskCommand || isCorrectCommand || isStartCommand || isHelpCommand,
     raw_update: update,
     processed: false,
   }, { onConflict: 'update_id' });
@@ -190,7 +194,10 @@ Get definitions, meanings, Arabic translations with full diacritics, and example
 <b>Examples:</b>
   • <code>/ask eloquent</code> — Word definition
   • <code>/ask What is the past tense of "go"?</code> — Grammar question
-  • <code>/ask Explain idiom "break the ice"</code> — Idiom explanation
+
+🔹 <code>/correct</code>
+Reply to any message with <code>/correct</code> to get smart grammar and text correction with two refined versions and learner insights.
+<b>Example:</b> Someone writes a sentence with errors → Reply with <code>/correct</code> → Get corrections + professional revision + tips.
 
 🔹 <b>Reply with</b> <code>/ask</code>
 Reply to any message in the group with <code>/ask</code> to ask the bot about that text — no need to retype it!
@@ -266,8 +273,31 @@ All responses are concise and include Arabic translations with full diacritics.`
   let shouldProcess = false;
   let questionText = '';
   let parentConversationId: string | null = null;
+  let isCorrection = false;
 
-  if (isAskCommand) {
+  if (isCorrectCommand) {
+    // /correct command — must be a reply to a message
+    let textToCorrect = text.replace(/^\/correct(@\w+)?\s*/, '').trim();
+    if (!textToCorrect && replyToMessageId && msg.reply_to_message?.text) {
+      textToCorrect = msg.reply_to_message.text.trim();
+    }
+    if (!textToCorrect) {
+      await storePromise;
+      const usageText = '📌 <b>Usage:</b>\n• Reply to any message with <code>/correct</code> to get grammar correction\n• Or: <code>/correct &lt;your text&gt;</code>';
+      const sentMessage = await sendTelegramMessage(chatId, usageText, lovableKey, telegramKey, messageId);
+      if (sentMessage) {
+        await supabase.from('telegram_conversations').insert({
+          chat_id: chatId, user_id: userId, bot_message_id: sentMessage.message_id,
+          user_message_id: messageId, user_text: '/correct', bot_response: usageText,
+          parent_conversation_id: null,
+        });
+      }
+      return;
+    }
+    shouldProcess = true;
+    questionText = textToCorrect;
+    isCorrection = true;
+  } else if (isAskCommand) {
     shouldProcess = true;
     questionText = text.replace(/^\/ask(@\w+)?\s*/, '').trim();
     // If /ask is used as a reply to another message and no text provided, use the replied message's text
@@ -367,13 +397,17 @@ All responses are concise and include Arabic translations with full diacritics.`
   }, 4000);
 
   try {
-    const aiResponse = await callAI(questionText, history, lovableKey);
-    // Match single words OR phrasal verbs (2-4 words, e.g. "hear me out", "break the ice")
-    const trimmedQ = questionText.trim();
-    const isDictionaryQuery = /^[A-Za-z][A-Za-z-]*(\s+[A-Za-z][A-Za-z-]*){0,3}$/.test(trimmedQ) && trimmedQ.split(/\s+/).length <= 4;
-    const finalResponse = isDictionaryQuery
-      ? normalizeDictionaryResponse(aiResponse, questionText.trim())
-      : aiResponse;
+    let finalResponse: string;
+    if (isCorrection) {
+      finalResponse = await callCorrectionAI(questionText, lovableKey);
+    } else {
+      const aiResponse = await callAI(questionText, history, lovableKey);
+      const trimmedQ = questionText.trim();
+      const isDictionaryQuery = /^[A-Za-z][A-Za-z-]*(\s+[A-Za-z][A-Za-z-]*){0,3}$/.test(trimmedQ) && trimmedQ.split(/\s+/).length <= 4;
+      finalResponse = isDictionaryQuery
+        ? normalizeDictionaryResponse(aiResponse, questionText.trim())
+        : aiResponse;
+    }
 
     clearInterval(typingInterval);
 
@@ -385,7 +419,7 @@ All responses are concise and include Arabic translations with full diacritics.`
       supabase.from('telegram_bot_logs').insert({
         chat_id: chatId,
         message_id: messageId,
-        action: isAskCommand ? 'ask_command' : 'reply_followup',
+        action: isCorrection ? 'correct_command' : (isAskCommand ? 'ask_command' : 'reply_followup'),
         details: { username, question: questionText, response_length: finalResponse.length },
       }),
     ];
@@ -649,6 +683,60 @@ For all other queries: respond in 1-3 sentences only. No elaboration. No extra c
     return data.choices?.[0]?.message?.content || 'No response generated.';
   } catch (e) {
     console.error('AI call error:', e);
+    return 'AI service unavailable. Try again later.';
+  }
+}
+
+async function callCorrectionAI(textToCorrect: string, lovableKey: string): Promise<string> {
+  const systemPrompt = `You are Natlus Assistance, a smart grammar and text correction bot.
+
+When given a text, you MUST provide EXACTLY this structured response using HTML formatting:
+
+✏️ <b>Direct Correction</b>
+[Fix ALL spelling, grammatical, and semantic errors while strictly preserving the user's original style, tone, and voice. Change only what is wrong.]
+
+📝 <b>Professional Revision</b>
+[Rewrite the text in a formal, polished style using advanced vocabulary, stronger verbs, and refined sentence structure. Elevate the quality while keeping the original meaning.]
+
+💡 <b>Learner Insights</b>
+[Briefly list the mistakes found and explain the grammar rules behind each correction. Use bullet points (•). Keep it educational and helpful. Max 3-4 key points.]
+
+RULES:
+- ALWAYS use this exact 3-section format with the exact headers above.
+- If the text has NO errors, say so in Direct Correction, but still provide a Professional Revision.
+- Keep the response concise. Max 1500 characters total.
+- If the text is in Arabic, correct Arabic grammar. If English, correct English grammar. If mixed, correct both.
+- When writing Arabic, ALWAYS use full diacritical marks (تَشْكِيل).
+- Do NOT add any introduction or conclusion outside the 3 sections.`;
+
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: `Correct the following text:\n\n"${textToCorrect}"` },
+  ];
+
+  try {
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${lovableKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages,
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error('AI gateway error (correction):', response.status, errText);
+      return 'AI processing error. Try again.';
+    }
+
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content || 'No response generated.';
+  } catch (e) {
+    console.error('AI correction call error:', e);
     return 'AI service unavailable. Try again later.';
   }
 }
