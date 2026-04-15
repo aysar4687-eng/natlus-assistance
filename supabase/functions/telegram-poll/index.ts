@@ -394,13 +394,17 @@ All responses are concise and include Arabic translations with full diacritics.`
   }, 4000);
 
   try {
-    const aiResponse = await callAI(questionText, history, lovableKey);
-    // Match single words OR phrasal verbs (2-4 words, e.g. "hear me out", "break the ice")
-    const trimmedQ = questionText.trim();
-    const isDictionaryQuery = /^[A-Za-z][A-Za-z-]*(\s+[A-Za-z][A-Za-z-]*){0,3}$/.test(trimmedQ) && trimmedQ.split(/\s+/).length <= 4;
-    const finalResponse = isDictionaryQuery
-      ? normalizeDictionaryResponse(aiResponse, questionText.trim())
-      : aiResponse;
+    let finalResponse: string;
+    if (isCorrection) {
+      finalResponse = await callCorrectionAI(questionText, lovableKey);
+    } else {
+      const aiResponse = await callAI(questionText, history, lovableKey);
+      const trimmedQ = questionText.trim();
+      const isDictionaryQuery = /^[A-Za-z][A-Za-z-]*(\s+[A-Za-z][A-Za-z-]*){0,3}$/.test(trimmedQ) && trimmedQ.split(/\s+/).length <= 4;
+      finalResponse = isDictionaryQuery
+        ? normalizeDictionaryResponse(aiResponse, questionText.trim())
+        : aiResponse;
+    }
 
     clearInterval(typingInterval);
 
@@ -412,7 +416,7 @@ All responses are concise and include Arabic translations with full diacritics.`
       supabase.from('telegram_bot_logs').insert({
         chat_id: chatId,
         message_id: messageId,
-        action: isAskCommand ? 'ask_command' : 'reply_followup',
+        action: isCorrection ? 'correct_command' : (isAskCommand ? 'ask_command' : 'reply_followup'),
         details: { username, question: questionText, response_length: finalResponse.length },
       }),
     ];
