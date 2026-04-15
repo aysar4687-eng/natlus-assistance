@@ -191,7 +191,10 @@ Get definitions, meanings, Arabic translations with full diacritics, and example
 <b>Examples:</b>
   • <code>/ask eloquent</code> — Word definition
   • <code>/ask What is the past tense of "go"?</code> — Grammar question
-  • <code>/ask Explain idiom "break the ice"</code> — Idiom explanation
+
+🔹 <code>/correct</code>
+Reply to any message with <code>/correct</code> to get smart grammar and text correction with two refined versions and learner insights.
+<b>Example:</b> Someone writes a sentence with errors → Reply with <code>/correct</code> → Get corrections + professional revision + tips.
 
 🔹 <b>Reply with</b> <code>/ask</code>
 Reply to any message in the group with <code>/ask</code> to ask the bot about that text — no need to retype it!
