@@ -270,8 +270,31 @@ All responses are concise and include Arabic translations with full diacritics.`
   let shouldProcess = false;
   let questionText = '';
   let parentConversationId: string | null = null;
+  let isCorrection = false;
 
-  if (isAskCommand) {
+  if (isCorrectCommand) {
+    // /correct command — must be a reply to a message
+    let textToCorrect = text.replace(/^\/correct(@\w+)?\s*/, '').trim();
+    if (!textToCorrect && replyToMessageId && msg.reply_to_message?.text) {
+      textToCorrect = msg.reply_to_message.text.trim();
+    }
+    if (!textToCorrect) {
+      await storePromise;
+      const usageText = '📌 <b>Usage:</b>\n• Reply to any message with <code>/correct</code> to get grammar correction\n• Or: <code>/correct &lt;your text&gt;</code>';
+      const sentMessage = await sendTelegramMessage(chatId, usageText, lovableKey, telegramKey, messageId);
+      if (sentMessage) {
+        await supabase.from('telegram_conversations').insert({
+          chat_id: chatId, user_id: userId, bot_message_id: sentMessage.message_id,
+          user_message_id: messageId, user_text: '/correct', bot_response: usageText,
+          parent_conversation_id: null,
+        });
+      }
+      return;
+    }
+    shouldProcess = true;
+    questionText = textToCorrect;
+    isCorrection = true;
+  } else if (isAskCommand) {
     shouldProcess = true;
     questionText = text.replace(/^\/ask(@\w+)?\s*/, '').trim();
     // If /ask is used as a reply to another message and no text provided, use the replied message's text
