@@ -140,6 +140,9 @@ Use <code>/ask</code> + any English word to get meanings, examples, and Arabic t
 🔄 <b>Reply Shortcut</b>
 Reply to any message with <code>/ask</code> to ask the bot about that text — no need to retype!
 
+✏️ <b>Grammar Correction</b>
+Reply to any message with <code>/correct</code> to get smart grammar correction with two refined versions and learning tips.
+
 🔍 <b>Ask Questions</b>
 Use <code>/ask</code> followed by any question:
 <code>/ask explain the word "serendipity"</code>
@@ -149,7 +152,7 @@ Reply directly to any of my messages to continue the conversation with context.
 
 ⚡ All responses are concise, formatted, and include Arabic translations when relevant.
 
-Type <code>/ask</code> to get started!`;
+Type <code>/ask</code> or <code>/correct</code> to get started!`;
       await sendTelegramMessage(chatId, welcomeText, lovableKey, telegramKey);
       return;
     }
