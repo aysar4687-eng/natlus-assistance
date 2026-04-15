@@ -160,6 +160,7 @@ Type <code>/ask</code> to get started!`;
   const username = msg.from?.username || msg.from?.first_name || 'Unknown';
   const replyToMessageId = msg.reply_to_message?.message_id;
   const isAskCommand = text.startsWith('/ask');
+  const isCorrectCommand = text.startsWith('/correct');
   const isStartCommand = text.startsWith('/start');
   const isHelpCommand = text.startsWith('/help');
 
@@ -172,7 +173,7 @@ Type <code>/ask</code> to get started!`;
     username,
     text,
     reply_to_message_id: replyToMessageId,
-    is_bot_command: isAskCommand || isStartCommand || isHelpCommand,
+    is_bot_command: isAskCommand || isCorrectCommand || isStartCommand || isHelpCommand,
     raw_update: update,
     processed: false,
   }, { onConflict: 'update_id' });
