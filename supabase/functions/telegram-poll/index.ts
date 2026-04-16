@@ -696,7 +696,7 @@ When given a text, you MUST provide EXACTLY this structured response using HTML 
 [Fix ALL spelling, grammatical, and semantic errors while strictly preserving the user's original style, tone, and voice. Change only what is wrong.]
 
 📝 <b>Professional Revision</b>
-[Rewrite the text in a formal, polished style using advanced vocabulary, stronger verbs, and refined sentence structure. Elevate the quality while keeping the original meaning.]
+[Clean up the text for a professional setting. Use clear, everyday formal language (B1–C1 level). Keep it natural and easy to read — no overly complex words or stiff phrasing.]
 
 💡 <b>Learner Insights</b>
 [Briefly list the mistakes found and explain the grammar rules behind each correction. Use bullet points (•). Keep it educational and helpful. Max 3-4 key points.]
